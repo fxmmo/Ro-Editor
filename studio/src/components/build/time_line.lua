@@ -16,7 +16,7 @@ function Timeline.new()
     
     self.Gui = Create"ScreenGui" {
         Name = "TimelineGUI",
-        Parent = nil,
+        Parent = game:GetService("Players").LocalPlayer.PlayerGui,
         
         Create"Frame" {
             Name = "MainFrame",
@@ -381,3 +381,5 @@ function Timeline:GetData(frameIndex, key)
 end
 
 return Timeline
+
+Timeline.new()
