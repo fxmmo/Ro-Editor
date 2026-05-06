@@ -1,4 +1,4 @@
-local load = loadstring(game:HttpGet("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/studio/src/utils/modules/require.lua"))
+local load = loadstring(game:HttpGet("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/studio/src/utils/modules/require.lua"))()
 local Create = load("./src/utils/modules/create.lua")
 
 local Timeline = {}
@@ -381,5 +381,3 @@ function Timeline:GetData(frameIndex, key)
 end
 
 return Timeline
-
-Timeline.new()
