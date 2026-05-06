@@ -1,5 +1,5 @@
 local load = loadstring(game:HttpGet("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/studio/src/utils/modules/require.lua"))
-local Create = load(./src/utils/modules/create.lua)
+local Create = load("./src/utils/modules/create.lua")
 
 local Timeline = {}
 Timeline.__index = Timeline
