@@ -10,21 +10,12 @@ local configs = {
   Placehoulders = Color3.fromRGB(46,98,239)
 }
 
-local Create = {}
-Create.__index = Create
-
-function Create.new(instance)
-  local self = setmetatable({}, Create)
-    self.instance = instance
-    return self
-end
-
-function Create:Window()
-  local Screen = Instance.new("ScreenGui")
-  Screen.IgnoreGuiInset = false
-  Screen.ResetOnSpawn = false
-  Screen.Name = "Dex"
-  Screen.Parent = cloneref(game:GetService("CoreGui"))
+local function Window()
+  local screen = Instance.new("ScreenGui")
+  screen.IgnoreGuiInset = false
+  screen.ResetOnSpawn = false
+  screen.Name = "Dex"
+  screen.Parent = cloneref(game:GetService("CoreGui"))
   
   local window = Instance.new("Frame")
   window.Parent = Screen
@@ -39,8 +30,9 @@ function Create:Window()
   content.BackgroundColor3 = Color3.fromRGB(40,40,40)
   content.Name = "Content"
   content.Parent = window
+
+  local title = Instance.new("TextButton")
+  
   
   return Screen, window, content
 end
-
-return Create
