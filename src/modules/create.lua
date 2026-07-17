@@ -18,7 +18,7 @@ local function Window()
   screen.Parent = cloneref(game:GetService("CoreGui"))
   
   local window = Instance.new("Frame")
-  window.Parent = Screen
+  window.Parent = screen
   window.Name = "Window"
   window.Size = configs.BackgroundSize
   window.BackgroundColor3 = configs.BackgroundColor
@@ -37,6 +37,5 @@ local function Window()
   search_bar.Size = UDim2.new(1, 0, 0, 22)
   search_bar.Parent = content
   
-  
-  return Screen, window, content
+  return screen, window, content
 end
