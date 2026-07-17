@@ -33,8 +33,9 @@ local function Window()
 
   local search_bar = Instance.new("Frame")
   search_bar.Name = "search_bar"
+  search_bar.BackgroundColor3 = Color3.fromRGB(52, 52, 52)
   search_bar.Size = UDim2.new(1, 0, 0, 22)
-  search_bar.Parent = 
+  search_bar.Parent = content
   
   
   return Screen, window, content
