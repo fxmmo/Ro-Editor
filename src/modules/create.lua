@@ -31,7 +31,10 @@ local function Window()
   content.Name = "Content"
   content.Parent = window
 
-  local title = Instance.new("TextButton")
+  local search_bar = Instance.new("Frame")
+  search_bar.Name = "search_bar"
+  search_bar.Size = UDim2.new(1, 0, 0, 22)
+  search_bar.Parent = 
   
   
   return Screen, window, content
