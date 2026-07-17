@@ -1,3 +1,8 @@
+local workspace = game:GetService("Workspace")
+local UserInput = game:GetService("UserInputService")
+
+local Drag = {}
+
 function Drag:Init(obj)
   local dragging = false
   local dragInput, dragStart, startPos
@@ -42,3 +47,5 @@ function Drag:Init(obj)
     end
   end)
 end
+
+return Drag
