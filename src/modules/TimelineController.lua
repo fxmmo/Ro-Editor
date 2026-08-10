@@ -105,7 +105,7 @@ function module:stop()
 end
 
 function module:addKeyframe()
-	local cam = CameraResolver.get()
+	local cam = CameraResolver.get(self.lastCam.Name)
 	if not cam then return end
 
 	local data = {
