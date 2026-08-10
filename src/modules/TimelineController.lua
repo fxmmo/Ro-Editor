@@ -61,7 +61,7 @@ end
 function module:toggleEditMode()
 	self.editMode = not self.editMode
 	local target = CameraResolver.get(self.lastCam.Name)
-	seUDim2.dles:setTarget(target)
+	self.handles:setTarget(target)
 	self.handles:show(self.editMode)
 	self.ui.editButton.BackgroundColor3 = self.editMode and Theme.Accent or Theme.Panel
 end
