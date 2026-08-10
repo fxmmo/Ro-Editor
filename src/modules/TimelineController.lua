@@ -260,7 +260,7 @@ function module:startLoop()
 		end
 
 		if self.cameraMode then
-			local cam = CameraResolver.get()
+			local cam = CameraResolver.get(self.lastCam.Name)
 			if cam then
 				workspace.CurrentCamera.CFrame = cam.CFrame
 			end
