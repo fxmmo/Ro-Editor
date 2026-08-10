@@ -1,8 +1,8 @@
 local module = {}
 
 module.Theme = {
-	Background = Color3.fromRGB(46, 46, 46),
-	Panel = Color3.fromRGB(53, 53, 53),
+	Background = Color3.fromRGB(43, 43, 43),
+	Panel = Color3.fromRGB(45, 45, 45),
 	PanelDark = Color3.fromRGB(37, 37, 37),
 	Header = Color3.fromRGB(60, 60, 60),
 	Border = Color3.fromRGB(30, 30, 30),
