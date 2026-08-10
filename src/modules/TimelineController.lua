@@ -1,9 +1,10 @@
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local ThemeConfig = require(script.Parent.ThemeConfig)
+local Dev = loadstring(game:HttpGet("https://raw.githubusercontent.com/fxmmo/Nightfall-Storage/refs/heads/main/utils/modules/dev.lua"))()
+local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua")
 local Theme = ThemeConfig.Theme
 local Config = ThemeConfig.Config
-local CameraResolver = require(script.Parent.CameraResolver)
+local CameraResolver = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/CameraResolver.lua")
 
 local module = {}
 module.__index = module
