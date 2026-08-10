@@ -1,5 +1,6 @@
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local Dev = loadstring(game:HttpGet(""))()
 local ThemeConfig = require(script.Parent.ThemeConfig)
 local Theme = ThemeConfig.Theme
 local Config = ThemeConfig.Config
