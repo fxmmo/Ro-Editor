@@ -5,6 +5,7 @@ local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Edito
 local Theme = ThemeConfig.Theme
 local Config = ThemeConfig.Config
 local CameraResolver = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/CameraResolver.lua")
+local _nextCamId = 1
 
 local module = {}
 module.__index = module
@@ -19,6 +20,7 @@ function module.new(interface, store, handles)
 	self.isDraggingPlayhead = false
 	self.editMode = false
 	self.cameraMode = false
+  self.lastCam = nil
 	self:setupButtons()
 	self:setupTimelineInput()
 	self:setupModeButtons()
@@ -33,6 +35,27 @@ function module:setupModeButtons()
 	self.ui.viewButton.MouseButton1Click:Connect(function()
 		self:toggleCameraMode()
 	end)
+  self.ui.addCamButton.MouseButton1Click:Connect(function()
+    self:addCamera()
+  end)
+end
+
+function module:addCamera()
+	local name = ("cam_" .. _nextCamId)
+	_nextCamId += 1
+	local camData = CameraResolver.createCam({
+		Name = name,
+		CFrame = CFrame.new(0, 5, 10),
+		FieldOfView = 70
+	})
+
+	if not camData then
+		return nil
+	end
+
+	if self.lastCam then
+		self.lastCam = camData
+	end
 end
 
 function module:toggleEditMode()
