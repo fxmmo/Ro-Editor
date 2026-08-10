@@ -60,8 +60,8 @@ end
 
 function module:toggleEditMode()
 	self.editMode = not self.editMode
-	local target = CameraResolver.get(self.lastCam)
-	self.handles:setTarget(target)
+	local target = CameraResolver.get(self.lastCam.Name)
+	seUDim2.dles:setTarget(target)
 	self.handles:show(self.editMode)
 	self.ui.editButton.BackgroundColor3 = self.editMode and Theme.Accent or Theme.Panel
 end
@@ -161,7 +161,7 @@ function module:selectKeyframe(data)
 end
 
 function module:tweenCameraTo(targetCFrame)
-	local cam = CameraResolver.get()
+	local cam = CameraResolver.get(self.lastCam.Name)
 	if not cam then return end
 
 	local startCFrame = cam.CFrame
