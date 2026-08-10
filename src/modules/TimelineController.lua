@@ -228,9 +228,7 @@ function module:updateTimeLabel()
 end
 
 function module:updatePlayhead()
-	local trackWidth = self.ui.area.AbsoluteSize.X - 10
-	local x = 5 + (self.currentTime / Config.MaxTime) * trackWidth
-	self.ui.playhead.Position = UDim2.new(0, x, 0, 2)
+	self.ui:setPlayheadPosition(self.currentTime)
 end
 
 function module:startLoop()
