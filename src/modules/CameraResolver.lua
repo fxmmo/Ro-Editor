@@ -14,7 +14,6 @@ end
 
 function module.createCam(props)
 	if not props or not props.Name then
-		warn("[CameraModule] props.Name é obrigatório")
 		return nil
 	end
 
@@ -41,7 +40,7 @@ function module.createCam(props)
 	camera.Parent = part
 
 	for key, value in pairs(props) do
-		if key \~= "Name" and key \~= "CFrame" and key \~= "Parent" and key \~= "FieldOfView" then
+		if key ~= "Name" and key ~= "CFrame" and key \~= "Parent" and key \~= "FieldOfView" then
 			pcall(function()
 				camera[key] = value
 			end)
