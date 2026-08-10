@@ -1,11 +1,9 @@
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local Dev = loadstring(game:HttpGet("https://raw.githubusercontent.com/fxmmo/Nightfall-Storage/refs/heads/main/utils/modules/dev.lua"))()
-local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua")
+local ThemeConfig = require(script.Parent.Parent.configs.Theme_Config)
 local Theme = ThemeConfig.Theme
 local Config = ThemeConfig.Config
-
 local module = {}
 module.__index = module
 

@@ -1,10 +1,9 @@
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local Dev = loadstring(game:HttpGet("https://raw.githubusercontent.com/fxmmo/Nightfall-Storage/refs/heads/main/utils/modules/dev.lua"))()
-local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua")
+local ThemeConfig = require(script.Parent.Parent.configs.Theme_Config)
 local Theme = ThemeConfig.Theme
 local Config = ThemeConfig.Config
-local CameraResolver = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/CameraResolver.lua")
+local CameraResolver = require(script.Parent.CameraResolver)
 local _nextCamId = 1
 
 local module = {}
@@ -52,10 +51,7 @@ function module:addCamera()
 	if not camData then
 		return nil
 	end
-
-	if self.lastCam then
-		self.lastCam = camData
-	end
+	self.lastCam = camData
 end
 
 function module:toggleEditMode()
@@ -133,7 +129,7 @@ function module:createKeyframeVisual(data)
 	kf.Text = ""
 	kf.ZIndex = 5
 	kf.Parent = self.ui.track
-	local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua")
+	local UIFactory = require(script.Parent.UIFactory)
 	UIFactory.corner(kf, 2)
 	UIFactory.stroke(kf, Theme.Border, 1)
 
@@ -204,7 +200,7 @@ function module:setupTimelineInput()
 end
 
 function module:updateCameraByTime()
-	local cam = CameraResolver.get()
+	local cam = CameraResolver.get(self.lastCam.Name)
 	if not cam or self.store:count() == 0 then return end
 
 	local prev, next = self.store:findNeighbors(self.currentTime)

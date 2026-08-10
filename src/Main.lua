@@ -1,8 +1,7 @@
-local Dev = loadstring(game:HttpGet("https://raw.githubusercontent.com/fxmmo/Nightfall-Storage/refs/heads/main/utils/modules/dev.lua"))()
-local KeyframeStore = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/KeyframeStore.lua")
-local HandleSystem = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/HandleSystem.lua")
-local Interface = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/Interface.lua")
-local TimelineController = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/TimelineController.lua")
+local KeyframeStore = require(script.modules.KeyframeStore)
+local HandleSystem = require(script.modules.HandleSystem)
+local Interface = require(script.modules.Interface)
+local TimelineController = require(script.modules.TimelineController)
 
 local System = {}
 System.__index = System
