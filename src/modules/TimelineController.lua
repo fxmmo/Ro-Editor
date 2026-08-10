@@ -110,7 +110,7 @@ function module:createKeyframeVisual(data)
 	kf.Text = ""
 	kf.ZIndex = 5
 	kf.Parent = self.ui.track
-	local UIFactory = require(script.Parent.UIFactory)
+	local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua")
 	UIFactory.corner(kf, 2)
 	UIFactory.stroke(kf, Theme.Border, 1)
 
