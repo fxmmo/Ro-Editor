@@ -137,6 +137,16 @@ function module:bindHandleEvents(axis)
 	end)
 end
 
+function module:build()
+	local axisXColor = (Theme and Theme.AxisX) or Color3.new(1, 0, 0)
+	local axisYColor = (Theme and Theme.AxisY) or Color3.new(0, 1, 0)
+	local axisZColor = (Theme and Theme.AxisZ) or Color3.new(0, 0.5, 1)
+	
+	self:createHandle("X", axisXColor, Vector3.new(1, 0, 0))
+	self:createHandle("Y", axisYColor, Vector3.new(0, 1, 0))
+	self:createHandle("Z", axisZColor, Vector3.new(0, 0, 1))
+end
+
 function module:setTarget(target)
 	self.selectedTarget = target
 	if target then
