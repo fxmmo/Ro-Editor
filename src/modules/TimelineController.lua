@@ -102,6 +102,7 @@ function module:stop()
 end
 
 function module:addKeyframe()
+	if not self.lastCam then return end
 	local cam = CameraResolver.get(self.lastCam.Name)
 	if not cam then return end
 
@@ -158,6 +159,7 @@ function module:selectKeyframe(data)
 end
 
 function module:tweenCameraTo(targetCFrame)
+	if not self.lastCam then return end
 	local cam = CameraResolver.get(self.lastCam.Name)
 	if not cam then return end
 
@@ -201,6 +203,7 @@ function module:setupTimelineInput()
 end
 
 function module:updateCameraByTime()
+	if not self.lastCam then return end
 	local cam = CameraResolver.get(self.lastCam.Name)
 	if not cam or self.store:count() == 0 then return end
 
@@ -257,7 +260,8 @@ function module:startLoop()
 		end
 
 		if self.cameraMode then
-			local cam = CameraResolver.get(self.lastCam.Name)
+			if not self.lastCam then return end
+	local cam = CameraResolver.get(self.lastCam.Name)
 			if cam then
 				workspace.CurrentCamera.CFrame = cam.CFrame
 			end
