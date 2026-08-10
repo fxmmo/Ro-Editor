@@ -61,8 +61,8 @@ function module:buildTopBar()
   self.addCamButton = UIFactory.button({
 		Parent = bar,
 		Position = UDim2.new(1, -370, 0.5, -13),
-		Size = UDim2.new(0, 110, 0, 26),
-		Text = "Add Camera",
+		Size = UDim2.new(0, 55, 0, 26),
+		Text = "Add",
 		Color = Theme.Panel,
 		Corner = 4,
 		ZIndex = 11,
@@ -71,8 +71,8 @@ function module:buildTopBar()
 	self.editButton = UIFactory.button({
 		Parent = bar,
 		Position = UDim2.new(1, -250, 0.5, -13),
-		Size = UDim2.new(0, 110, 0, 26),
-		Text = "Edit Camera",
+		Size = UDim2.new(0, 55, 0, 26),
+		Text = "Edit",
 		Color = Theme.Panel,
 		Corner = 4,
 		ZIndex = 11,
@@ -81,8 +81,8 @@ function module:buildTopBar()
 	self.viewButton = UIFactory.button({
 		Parent = bar,
 		Position = UDim2.new(1, -130, 0.5, -13),
-		Size = UDim2.new(0, 110, 0, 26),
-		Text = "View Camera",
+		Size = UDim2.new(0, 55, 0, 26),
+		Text = "View",
 		Color = Theme.Panel,
 		Corner = 4,
 		ZIndex = 11,
