@@ -57,9 +57,6 @@ end
 
 function module:storeFor(cameraName)
 	if not self.storeByCamera[cameraName] then
-		self.storeByCamera[cameraName] = (loadstring and loadstring or function() end)("return {}") and nil
-	end
-	if not self.storeByCamera[cameraName] then
 		self.storeByCamera[cameraName] = setmetatable({keyframes = {}, selected = nil}, {__index = self.store})
 	end
 	return self.storeByCamera[cameraName]
@@ -110,6 +107,17 @@ function module:addCamera()
 	self:_refreshTimelineHeight()
 end
 
+function module:selectCamera(cameraName)
+	local entry = CameraResolver.get(cameraName)
+	if not entry then return end
+	self.lastCam = entry
+	self.ui:setActiveCamera(cameraName)
+	if self.cameraMode then
+		workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
+		workspace.CurrentCamera = entry.camera
+	end
+end
+
 function module:toggleEditMode()
 	local entry = self:activeCam()
 	if not entry then
@@ -146,7 +154,6 @@ function module:_refreshTimelineHeight()
 	local rowH = 36
 	local pad = 4
 	local desired = math.clamp(count * (rowH + pad) + 28, 160, 280)
-	self.ui.timelinePanel = self.ui.timelinePanel
 	local panel = self.ui.gui:FindFirstChild("TimelinePanel")
 	if panel then
 		panel.Size = UDim2.new(1, 0, 0, desired)
@@ -222,15 +229,6 @@ function module:selectKeyframe(camName, data)
 	local store = self:storeFor(camName)
 	store:setSelected(data)
 	self.currentTime = data.time
-
-	for _, kf in ipairs(store.keyframes) do
-		if kf.frame and kf.frame.Parent then
-			kf.frame.BackgroundColor3 = Theme.Keyframe
-		end
-	end
-	if data.frame and data.frame.Parent then
-		data.frame.BackgroundColor3 = Theme.KeyframeSelected
-	end
 
 	self:tweenCameraTo(data.cframe)
 end
@@ -346,9 +344,7 @@ function module:startLoop()
 
 		if self.isDraggingPlayhead then
 			local mousePos = UserInputService:GetMouseLocation()
-			local relX = mousePos.X - self.ui.area.AbsolutePosition.X
-			local normalized = math.clamp(relX / self.ui.area.AbsoluteSize.X, 0, 1)
-			self.currentTime = normalized * Config.MaxTime
+			self.currentTime = self.ui:xToTime(mousePos.X)
 			self.isPlaying = false
 			self:updateCameraByTime()
 		end
