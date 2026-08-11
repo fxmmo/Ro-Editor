@@ -41,6 +41,7 @@ function module.new(interface, store, handles)
 	self.editMode = false
 	self.cameraMode = false
 	self.lastCam = nil
+	self.playerCamera = workspace.CurrentCamera
 	self.storeByCamera = {}
 	self.connections = {}
 	self.ui.onTrackSelected = function(cameraName)
@@ -48,6 +49,9 @@ function module.new(interface, store, handles)
 	end
 	self.ui.onKeyframeSelected = function(cameraName, data)
 		self:selectKeyframe(cameraName, data)
+	end
+	self.handles.onChanged = function()
+		self:updateSelectedKeyframe()
 	end
 	self.handles:show(false)
 	self:setupButtons()
@@ -123,8 +127,8 @@ function module:selectCamera(cameraName)
 		self.handles:setTarget(entry.part)
 		self.handles:show(true)
 	end
-	if self.cameraMode then
-		workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
+	if self.cameraMode and entry.camera then
+		entry.camera.CameraType = Enum.CameraType.Scriptable
 		workspace.CurrentCamera = entry.camera
 	end
 end
@@ -137,6 +141,11 @@ function module:toggleEditMode()
 		return
 	end
 
+	if not self.editMode and self.cameraMode then
+		self.cameraMode = false
+		self.ui:setViewToggle(false)
+		self:_applyCameraMode()
+	end
 	self.editMode = not self.editMode
 	self.handles:setTarget(entry.part)
 	self.handles:show(self.editMode)
@@ -144,18 +153,20 @@ end
 
 function module:_applyCameraMode()
 	if self.cameraMode then
-		workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
-		if self.lastCam then
-			local camData = CameraResolver.get(self.lastCam.name)
-			if camData and camData.camera then
-				workspace.CurrentCamera = camData.camera
-			end
+		local entry = self:activeCam()
+		if not entry or not entry.camera then return end
+		if workspace.CurrentCamera ~= entry.camera then
+			self.playerCamera = workspace.CurrentCamera
 		end
+		entry.camera.CameraType = Enum.CameraType.Scriptable
+		workspace.CurrentCamera = entry.camera
 	else
-		workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
-		if Players.LocalPlayer.Character then
-			workspace.CurrentCamera.CameraSubject = Players.LocalPlayer.Character
-		end
+		if not self.playerCamera or not self.playerCamera.Parent then return end
+		workspace.CurrentCamera = self.playerCamera
+		self.playerCamera.CameraType = Enum.CameraType.Custom
+		local character = Players.LocalPlayer.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		self.playerCamera.CameraSubject = humanoid or character
 	end
 end
 
@@ -223,6 +234,7 @@ function module:addKeyframe()
 		cameraName = camName,
 	}
 	store:add(data)
+	store:setSelected(data)
 
 	local record = self.ui:createKeyframeVisual(camName, time)
 	data.frame = record.diamond
@@ -230,6 +242,17 @@ function module:addKeyframe()
 
 	self.addBtn.BackgroundColor3 = Theme.Success
 	task.delay(0.2, function() self.addBtn.BackgroundColor3 = Theme.Panel end)
+end
+
+function module:updateSelectedKeyframe()
+	local entry = self:activeCam()
+	if not entry or not entry.part or not self.lastCam then return end
+	local store = self:storeFor(self.lastCam.name)
+	local selected = store:getSelected()
+	if not selected then return end
+	selected.cframe = entry.part.CFrame
+	selected.position = entry.part.Position
+	selected.orientation = entry.part.Orientation
 end
 
 function module:selectKeyframe(camName, data)
@@ -362,16 +385,6 @@ function module:startLoop()
 			self.handles:update()
 			if self.handles.isDragging then
 				self.handles:dragUpdate()
-			end
-		end
-
-		if self.cameraMode then
-			local entry = self:activeCam()
-			if entry then
-				local camCFrame = CameraResolver.getCFrame(entry)
-				if camCFrame then
-					workspace.CurrentCamera.CFrame = camCFrame
-				end
 			end
 		end
 
