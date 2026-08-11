@@ -5,6 +5,7 @@ local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Edito
 local Theme = ThemeConfig.Theme
 local Config = ThemeConfig.Config
 local CameraResolver = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/CameraResolver.lua")
+local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua")
 local _nextCamId = 1
 
 local module = {}
@@ -20,12 +21,18 @@ function module.new(interface, store, handles)
 	self.isDraggingPlayhead = false
 	self.editMode = false
 	self.cameraMode = false
-  self.lastCam = nil
+	self.lastCam = nil
+	self.connections = {}
 	self:setupButtons()
 	self:setupTimelineInput()
 	self:setupModeButtons()
 	self:startLoop()
 	return self
+end
+
+function module:activeCam()
+	if not self.lastCam or not self.lastCam.name then return nil end
+	return CameraResolver.get(self.lastCam.name)
 end
 
 function module:setupModeButtons()
@@ -35,9 +42,9 @@ function module:setupModeButtons()
 	self.ui.viewButton.MouseButton1Click:Connect(function()
 		self:toggleCameraMode()
 	end)
-  self.ui.addCamButton.MouseButton1Click:Connect(function()
-    self:addCamera()
-  end)
+	self.ui.addCamButton.MouseButton1Click:Connect(function()
+		self:addCamera()
+	end)
 end
 
 function module:addCamera()
@@ -56,9 +63,16 @@ function module:addCamera()
 end
 
 function module:toggleEditMode()
+	local entry = self:activeCam()
+	if not entry then
+		self.editMode = false
+		self.handles:show(false)
+		self.ui.editButton.BackgroundColor3 = Theme.Panel
+		return
+	end
+
 	self.editMode = not self.editMode
-	local target = CameraResolver.get(self.lastCam.Name)
-	self.handles:setTarget(target)
+	self.handles:setTarget(entry.part)
 	self.handles:show(self.editMode)
 	self.ui.editButton.BackgroundColor3 = self.editMode and Theme.Accent or Theme.Panel
 end
@@ -102,15 +116,14 @@ function module:stop()
 end
 
 function module:addKeyframe()
-	if not self.lastCam then return end
-	local cam = CameraResolver.get(self.lastCam.Name)
-	if not cam then return end
+	local entry = self:activeCam()
+	if not entry or not entry.part then return end
 
 	local data = {
 		time = self.currentTime,
-		position = cam.Position,
-		orientation = cam.Orientation,
-		cframe = cam.CFrame,
+		position = entry.part.Position,
+		orientation = entry.part.Orientation,
+		cframe = entry.part.CFrame,
 	}
 	self:createKeyframeVisual(data)
 	self.store:add(data)
@@ -131,7 +144,6 @@ function module:createKeyframeVisual(data)
 	kf.Text = ""
 	kf.ZIndex = 5
 	kf.Parent = self.ui.track
-	local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua")
 	UIFactory.corner(kf, 2)
 	UIFactory.stroke(kf, Theme.Border, 1)
 
@@ -159,18 +171,18 @@ function module:selectKeyframe(data)
 end
 
 function module:tweenCameraTo(targetCFrame)
-	if not self.lastCam then return end
-	local cam = CameraResolver.get(self.lastCam.Name)
-	if not cam then return end
+	local entry = self:activeCam()
+	if not entry or not targetCFrame then return end
 
-	local startCFrame = cam.CFrame
-	local startTime = tick()
+	local startCFrame = CameraResolver.getCFrame(entry)
+	if not startCFrame then return end
+	local startTime = os.clock()
 	local connection
 	connection = RunService.RenderStepped:Connect(function()
-		local elapsed = tick() - startTime
+		local elapsed = os.clock() - startTime
 		local alpha = math.min(elapsed / Config.InterpolationDuration, 1)
 		alpha = 1 - (1 - alpha) ^ 2
-		cam.CFrame = startCFrame:Lerp(targetCFrame, alpha)
+		CameraResolver.setCFrame(entry, startCFrame:Lerp(targetCFrame, alpha))
 		if alpha >= 1 then
 			connection:Disconnect()
 		end
@@ -194,7 +206,7 @@ function module:setupTimelineInput()
 		end
 	end)
 
-	UserInputService.InputEnded:Connect(function(input)
+	self.connections.InputEnded = UserInputService.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			self.isDraggingPlayhead = false
 			self.handles:stopDrag()
@@ -203,19 +215,19 @@ function module:setupTimelineInput()
 end
 
 function module:updateCameraByTime()
-	if not self.lastCam then return end
-	local cam = CameraResolver.get(self.lastCam.Name)
-	if not cam or self.store:count() == 0 then return end
+	local entry = self:activeCam()
+	if not entry or self.store:count() == 0 then return end
 
-	local prev, next = self.store:findNeighbors(self.currentTime)
-	if prev and next then
-		local alpha = (self.currentTime - prev.time) / (next.time - prev.time)
+	local prevKf, nextKf = self.store:findNeighbors(self.currentTime)
+	if prevKf and nextKf then
+		local span = nextKf.time - prevKf.time
+		local alpha = span > 0 and (self.currentTime - prevKf.time) / span or 0
 		alpha = math.clamp(alpha, 0, 1)
-		cam.CFrame = prev.cframe:Lerp(next.cframe, alpha)
-	elseif prev then
-		cam.CFrame = prev.cframe
-	elseif next then
-		cam.CFrame = next.cframe
+		CameraResolver.setCFrame(entry, prevKf.cframe:Lerp(nextKf.cframe, alpha))
+	elseif prevKf then
+		CameraResolver.setCFrame(entry, prevKf.cframe)
+	elseif nextKf then
+		CameraResolver.setCFrame(entry, nextKf.cframe)
 	end
 end
 
@@ -232,7 +244,7 @@ function module:updatePlayhead()
 end
 
 function module:startLoop()
-	RunService.RenderStepped:Connect(function(dt)
+	self.connections.RenderStepped = RunService.RenderStepped:Connect(function(dt)
 		if self.isPlaying then
 			self.currentTime = self.currentTime + dt
 			if self.currentTime >= Config.MaxTime then
@@ -254,20 +266,34 @@ function module:startLoop()
 
 		if self.editMode then
 			self.handles:update()
-			self.handles:dragUpdate()
+			if self.handles.isDragging then
+				self.handles:dragUpdate()
+			end
 		end
 
 		if self.cameraMode then
-			if not self.lastCam then return end
-	local cam = CameraResolver.get(self.lastCam.Name)
-			if cam then
-				workspace.CurrentCamera.CFrame = cam.CFrame
+			local entry = self:activeCam()
+			local camCFrame = CameraResolver.getCFrame(entry)
+			if camCFrame then
+				workspace.CurrentCamera.CFrame = camCFrame
 			end
 		end
 
 		self:updatePlayhead()
 		self:updateTimeLabel()
 	end)
+end
+
+function module:destroy()
+	for _, connection in pairs(self.connections) do
+		if connection then
+			connection:Disconnect()
+		end
+	end
+	self.connections = {}
+	if self.handles then
+		self.handles:destroy()
+	end
 end
 
 return module

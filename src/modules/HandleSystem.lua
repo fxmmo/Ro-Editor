@@ -19,6 +19,7 @@ function module.new()
 	self.selectedTarget = nil
 	self.activeAxis = nil
 	self.isDragging = false
+	self.hoveredAxis = nil
 	self.lastMouse = Vector2.new()
 	self.handles = {}
 	self.connections = {}
@@ -30,6 +31,13 @@ function module.new()
 end
 
 function module:setupGlobalEvents()
+	self.connections.InputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if gameProcessed then return end
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+		if not self.hoveredAxis or not self.selectedTarget then return end
+		self:startDrag(self.hoveredAxis)
+	end)
+
 	self.connections.InputChanged = UserInputService.InputChanged:Connect(function(input, gameProcessed)
 		if gameProcessed then return end
 		if input.UserInputType == Enum.UserInputType.MouseMovement and self.isDragging then
@@ -113,27 +121,33 @@ function module:bindHandleEvents(axis)
 	end
 
 	data.clickDetector.MouseHoverEnter:Connect(function()
+		self.hoveredAxis = axis
 		if not self.isDragging then
 			highlight(true)
 		end
 	end)
 
 	data.clickDetector.MouseHoverLeave:Connect(function()
+		if self.hoveredAxis == axis then
+			self.hoveredAxis = nil
+		end
 		if not self.isDragging then
 			highlight(false)
 		end
 	end)
+end
 
-	data.clickDetector.MouseClick:Connect(function(player)
-		if player ~= game.Players.LocalPlayer then return end
-		
-		self.activeAxis = axis
-		self.isDragging = true
-		self.lastMouse = UserInputService:GetMouseLocation()
-		highlight(true)
-		
-		data.part.Transparency = 0.2
-	end)
+function module:startDrag(axis)
+	local data = self.handles[axis]
+	if not data then return end
+
+	self.activeAxis = axis
+	self.isDragging = true
+	self.lastMouse = UserInputService:GetMouseLocation()
+	data.part.Transparency = 0.2
+	if data.selection then
+		data.selection.Visible = true
+	end
 end
 
 function module:build()
@@ -182,9 +196,10 @@ function module:update()
 end
 
 function module:dragUpdate()
-	if not self.isDragging or not self.activeAxis or not self.selectedTarget then 
+	if not self.isDragging then return end
+	if not self.activeAxis or not self.selectedTarget or not self.selectedTarget.Parent then
 		self:stopDrag()
-		return 
+		return
 	end
 	
 	local mouse = UserInputService:GetMouseLocation()
@@ -196,8 +211,13 @@ function module:dragUpdate()
 	
 	local moveAmount = (delta.X + delta.Y) * 0.03 * MOUSE_SENSITIVITY
 	
-	self.selectedTarget.Position += axisData.direction * moveAmount
-	
+	self.selectedTarget.CFrame = self.selectedTarget.CFrame + (axisData.direction * moveAmount)
+
+	local childCamera = self.selectedTarget:FindFirstChildOfClass("Camera")
+	if childCamera then
+		childCamera.CFrame = self.selectedTarget.CFrame
+	end
+
 	self:update()
 end
 

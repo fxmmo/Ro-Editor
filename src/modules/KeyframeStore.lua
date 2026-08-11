@@ -40,17 +40,17 @@ end
 
 function module:findNeighbors(time)
 	local sorted = self:sorted()
-	local prev, next = nil, nil
+	local prevKf, nextKf = nil, nil
 	for _, kf in ipairs(sorted) do
 		if kf.time <= time then
-			prev = kf
+			prevKf = kf
 		end
-		if kf.time > time and not next then
-			next = kf
+		if kf.time > time and not nextKf then
+			nextKf = kf
 			break
 		end
 	end
-	return prev, next
+	return prevKf, nextKf
 end
 
 function module:count()

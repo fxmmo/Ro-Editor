@@ -40,7 +40,7 @@ function module.createCam(props)
 	camera.Parent = part
 
 	for key, value in pairs(props) do
-		if key ~= "Name" and key ~= "CFrame" and key \~= "Parent" and key \~= "FieldOfView" then
+		if key ~= "Name" and key ~= "CFrame" and key ~= "Parent" and key ~= "FieldOfView" then
 			pcall(function()
 				camera[key] = value
 			end)
@@ -54,6 +54,31 @@ function module.createCam(props)
 	}
 
 	return _cameraCache[props.Name]
+end
+
+function module.setCFrame(entry, cframe)
+	if not entry or not cframe then
+		return
+	end
+	if entry.part and entry.part.Parent then
+		entry.part.CFrame = cframe
+	end
+	if entry.camera then
+		entry.camera.CFrame = cframe
+	end
+end
+
+function module.sync(entry)
+	if entry and entry.part and entry.camera then
+		entry.camera.CFrame = entry.part.CFrame
+	end
+end
+
+function module.getCFrame(entry)
+	if entry and entry.part then
+		return entry.part.CFrame
+	end
+	return nil
 end
 
 function module.get(name)
