@@ -18,7 +18,6 @@ if not Dev then
 	_G.__RoEditorDev = Dev
 end
 local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua") or error("[Ro-Editor] import failed")
 local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua") or error("[Ro-Editor] import failed")
@@ -26,6 +25,28 @@ local Theme = ThemeConfig.Theme
 local Config = ThemeConfig.Config
 local module = {}
 module.__index = module
+
+local TRACK_PADDING = 8
+local KF_LABEL_OFFSET = 100
+
+local function getMaxTime()
+	return Config.MaxTime or 10
+end
+
+local function xToTime(absX, areaAbsX, areaWidth)
+	local maxTime = getMaxTime()
+	if areaWidth <= 16 then return 0 end
+	local relX = absX - areaAbsX - TRACK_PADDING
+	local n = math.clamp(relX / (areaWidth - 16), 0, 1)
+	return n * maxTime
+end
+
+local function timeToX(t, areaWidth)
+	local maxTime = getMaxTime()
+	local clamped = math.clamp(t, 0, maxTime)
+	if areaWidth <= 16 then return TRACK_PADDING end
+	return TRACK_PADDING + (clamped / maxTime) * (areaWidth - 16)
+end
 
 function module.new()
 	local self = setmetatable({}, module)
@@ -39,6 +60,14 @@ function module.new()
 	self.tracks = {}
 	self.activeCameraName = nil
 	return self
+end
+
+function module:timeToX(t)
+	return timeToX(t, self.area.AbsoluteSize.X)
+end
+
+function module:xToTime(absX)
+	return xToTime(absX, self.area.AbsolutePosition.X, self.area.AbsoluteSize.X)
 end
 
 function module:buildTopBar()
@@ -168,7 +197,7 @@ function module:buildCamerasModal()
 	UIFactory.corner(switchRow, 4)
 	UIFactory.stroke(switchRow, Theme.Border, 1)
 
-	local switchLabel = UIFactory.label({
+	UIFactory.label({
 		Parent = switchRow,
 		Position = UDim2.new(0, 10, 0, 0),
 		Size = UDim2.new(1, -60, 1, 0),
@@ -428,7 +457,7 @@ function module:buildRuler()
 	})
 	ruler.BackgroundTransparency = 1
 
-	local maxTime = Config.MaxTime or 10
+	local maxTime = getMaxTime()
 	for i = 0, maxTime do
 		local xPos = i / maxTime
 		local marker = Instance.new("Frame")
@@ -465,10 +494,13 @@ function module:buildRuler()
 end
 
 function module:buildPlayhead()
+	if self.playheadLine and self.playheadLine.Parent then
+		self.playheadLine.Parent = nil
+	end
 	self.playheadLine = Instance.new("Frame")
 	self.playheadLine.Name = "PlayheadLine"
 	self.playheadLine.Size = UDim2.new(0, 2, 1, -8)
-	self.playheadLine.Position = UDim2.new(0, 8, 0, 4)
+	self.playheadLine.Position = UDim2.new(0, TRACK_PADDING, 0, 4)
 	self.playheadLine.BackgroundColor3 = Theme.Playhead
 	self.playheadLine.BorderSizePixel = 0
 	self.playheadLine.Parent = self.area
@@ -526,7 +558,6 @@ function module:ensureTrack(cameraName)
 	UIFactory.corner(row, 4)
 	UIFactory.stroke(row, Theme.Border, 1, 0.5)
 
-	row.BackgroundColor3 = Theme.Panel
 	local grad = Instance.new("UIGradient")
 	grad.Color = ColorSequence.new{
 		ColorSequenceKeypoint.new(0, Theme.Panel),
@@ -549,7 +580,7 @@ function module:ensureTrack(cameraName)
 	local kfContainer = Instance.new("Frame")
 	kfContainer.Name = "Keyframes"
 	kfContainer.Size = UDim2.new(1, -110, 1, 0)
-	kfContainer.Position = UDim2.new(0, 100, 0, 0)
+	kfContainer.Position = UDim2.new(0, KF_LABEL_OFFSET, 0, 0)
 	kfContainer.BackgroundTransparency = 1
 	kfContainer.ClipsDescendants = true
 	kfContainer.Parent = row
@@ -561,6 +592,7 @@ function module:ensureTrack(cameraName)
 		keyframesContainer = kfContainer,
 		keyframes = {},
 		activeKeyframe = nil,
+		cameraName = cameraName,
 	}
 	self.tracks[cameraName] = track
 	return track
@@ -571,7 +603,7 @@ function module:setActiveCamera(cameraName)
 	for name, tr in pairs(self.tracks) do
 		local highlight = (name == cameraName)
 		tr.row.BackgroundColor3 = highlight
-			and Theme.Panel:Lerp(Theme.Accent, 0.12)
+			and Theme.Accent:Lerp(Theme.Panel, 0.25)
 			or Theme.Panel
 	end
 end
@@ -594,7 +626,7 @@ end
 
 function module:createKeyframeVisual(cameraName, time)
 	local track = self:ensureTrack(cameraName)
-	local maxTime = Config.MaxTime or 10
+	local maxTime = getMaxTime()
 	local xPos = (time or 0) / maxTime
 
 	local guide = Instance.new("Frame")
@@ -627,7 +659,6 @@ function module:createKeyframeVisual(cameraName, time)
 		diamond = diamond,
 		guide = guide,
 		expanded = false,
-		active = false,
 	}
 	track.keyframes[#track.keyframes + 1] = record
 
@@ -673,11 +704,11 @@ function module:removeKeyframeVisual(cameraName, time)
 end
 
 function module:updatePlayheadProximity(time, pixelPos)
-	local maxTime = Config.MaxTime or 10
+	local maxTime = getMaxTime()
 	local threshold = 6
 	for _, track in pairs(self.tracks) do
 		for _, kf in ipairs(track.keyframes) do
-			local kfX = (kf.time / maxTime) * (self.area.AbsoluteSize.X - 16) + 8
+			local kfX = (kf.time / maxTime) * (self.area.AbsoluteSize.X - 16) + TRACK_PADDING
 			local dist = math.abs(pixelPos - kfX)
 			local shouldExpand = dist < threshold
 			if shouldExpand ~= kf.expanded then
@@ -686,13 +717,11 @@ function module:updatePlayheadProximity(time, pixelPos)
 					TweenService:Create(kf.diamond, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 						Size = UDim2.new(0, 18, 0, 18),
 						Position = UDim2.new(kf.time / maxTime, -9, 0.5, -9),
-						BackgroundColor3 = Theme.Playhead,
 					}):Play()
 				else
 					TweenService:Create(kf.diamond, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 						Size = UDim2.new(0, 12, 0, 12),
 						Position = UDim2.new(kf.time / maxTime, -6, 0.5, -6),
-						BackgroundColor3 = Theme.Keyframe or Theme.Accent or Theme.Playhead,
 					}):Play()
 				end
 			end
@@ -732,12 +761,10 @@ function module:createIconControl(index, icon, callback, tooltip)
 end
 
 function module:setPlayheadPosition(time)
-	local maxTime = Config.MaxTime or 10
+	local maxTime = getMaxTime()
 	local clampedTime = math.clamp(time, 0, maxTime)
-	local xPos = clampedTime / maxTime
-
-	local areaWidth = self.area.AbsoluteSize.X - 16
-	local pixelPos = 8 + (xPos * areaWidth)
+	local areaWidth = self.area.AbsoluteSize.X
+	local pixelPos = timeToX(clampedTime, areaWidth)
 
 	self.playheadLine.Position = UDim2.new(0, pixelPos, 0, 4)
 
