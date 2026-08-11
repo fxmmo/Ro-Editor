@@ -66,7 +66,7 @@ end
 function module:setupGlobalEvents()
 	self.connections.InputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed then return end
-		if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+		if input.UserInputType \~= Enum.UserInputType.MouseButton1 then return end
 		if not self.hoveredAxis or not self.selectedTarget then return end
 		self:startDrag(self.hoveredAxis)
 	end)
@@ -106,13 +106,11 @@ function module:build()
 	for axis, color in pairs(AXIS_COLORS) do
 		local handle = Instance.new("Handles")
 		handle.Name = "Handle_" .. axis
-		handle.Style = Enum.HandleStyle.Movement
-		handle.Massless = true
-		handle.Color = color
+		handle.Style = Enum.HandlesStyle.Movement
+		handle.Color3 = color
 		handle.Transparency = 0.3
-		handle.Size = Vector3.new(HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE)
 		handle.Adornee = basePart
-		handle.Face = AXIS_FACES[axis]
+		handle.Faces = Faces.new(AXIS_FACES[axis])
 		handle.Parent = basePart
 
 		self.handles[axis] = {
