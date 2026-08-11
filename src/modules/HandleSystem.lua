@@ -104,7 +104,7 @@ function module:build()
 	basePart.Parent = workspace
 
 	for axis, color in pairs(AXIS_COLORS) do
-		local handle = Instance.new("Handle")
+		local handle = Instance.new("Handles")
 		handle.Name = "Handle_" .. axis
 		handle.Style = Enum.HandleStyle.Movement
 		handle.Massless = true
