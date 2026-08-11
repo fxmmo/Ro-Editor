@@ -552,6 +552,7 @@ function module:ensureTrack(cameraName)
 	row.Size = UDim2.new(1, -8, 0, 36)
 	row.BackgroundColor3 = Theme.Panel
 	row.BorderSizePixel = 0
+	row.Active = true
 	row.LayoutOrder = #self.tracks + 1
 	row.Parent = self.tracksList
 	row.ZIndex = 12
@@ -594,6 +595,13 @@ function module:ensureTrack(cameraName)
 		activeKeyframe = nil,
 		cameraName = cameraName,
 	}
+	row.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			if self.onTrackSelected then
+				self.onTrackSelected(cameraName)
+			end
+		end
+	end)
 	self.tracks[cameraName] = track
 	return track
 end
@@ -638,8 +646,11 @@ function module:createKeyframeVisual(cameraName, time)
 	guide.Parent = track.keyframesContainer
 	guide.ZIndex = 13
 
-	local diamond = Instance.new("Frame")
+	local diamond = Instance.new("TextButton")
 	diamond.Name = "Keyframe_" .. tostring(time)
+	diamond.Text = ""
+	diamond.AutoButtonColor = false
+	diamond.Active = true
 	diamond.Size = UDim2.new(0, 12, 0, 12)
 	diamond.Position = UDim2.new(xPos, -6, 0.5, -6)
 	diamond.BackgroundColor3 = Theme.Keyframe or Theme.Accent or Theme.Playhead
@@ -661,6 +672,11 @@ function module:createKeyframeVisual(cameraName, time)
 		expanded = false,
 	}
 	track.keyframes[#track.keyframes + 1] = record
+	diamond.MouseButton1Click:Connect(function()
+		if self.onKeyframeSelected and record.data then
+			self.onKeyframeSelected(cameraName, record.data)
+		end
+	end)
 
 	local defaultSize = diamond.Size
 	local hoverSize = UDim2.new(0, 16, 0, 16)
