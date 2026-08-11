@@ -36,6 +36,8 @@ function module.new()
 	self.gui.IgnoreGuiInset = true
 	self.gui.Parent = player:WaitForChild("PlayerGui")
 	self.modalOpen = false
+	self.tracks = {}
+	self.activeCameraName = nil
 	return self
 end
 
@@ -79,7 +81,6 @@ function module:buildTopBar()
 		ZIndex = 11,
 	})
 
-	-- Single launcher button (was 3 buttons: View / Add / Edit Camera)
 	self.camerasButton = UIFactory.button({
 		Parent = bar,
 		Position = UDim2.new(1, -150, 0.5, -13),
@@ -91,13 +92,12 @@ function module:buildTopBar()
 	})
 
 	self:buildCamerasModal()
+	self:buildTimelinePanel()
 
 	return bar
 end
 
--- Floating window containing View / Add / Edit Camera
 function module:buildCamerasModal()
-	-- Backdrop
 	local backdrop = UIFactory.frame({
 		Parent = self.gui,
 		Size = UDim2.new(1, 0, 1, 0),
@@ -109,11 +109,9 @@ function module:buildCamerasModal()
 	backdrop.BackgroundTransparency = 1
 	backdrop.Visible = false
 
-	-- Modal panel
 	local panel = UIFactory.frame({
 		Parent = self.gui,
-		Size = UDim2.new(0, 240, 0, 170),
-		Position = UDim2.new(0.5, -120, 0.5, -85),
+		Size = UDim2.new(0, 240, 0, 200),
 		Color = Theme.Panel,
 		Corner = 6,
 		Name = "CamerasModal",
@@ -122,7 +120,6 @@ function module:buildCamerasModal()
 	UIFactory.stroke(panel, Theme.Border, 1)
 	UIFactory.shadow(panel, 0.18)
 
-	-- Header
 	local header = UIFactory.frame({
 		Parent = panel,
 		Size = UDim2.new(1, 0, 0, 32),
@@ -144,7 +141,6 @@ function module:buildCamerasModal()
 		ZIndex = 53,
 	})
 
-	-- Close button (×)
 	local closeBtn = Instance.new("TextButton")
 	closeBtn.Name = "Close"
 	closeBtn.Size = UDim2.new(0, 22, 0, 22)
@@ -161,7 +157,58 @@ function module:buildCamerasModal()
 	UIFactory.corner(closeBtn, 3)
 	UIFactory.stroke(closeBtn, Theme.Border, 1)
 
-	-- Helper that styles a row button
+	local switchRow = Instance.new("Frame")
+	switchRow.Name = "ViewRow"
+	switchRow.Size = UDim2.new(1, -24, 0, 30)
+	switchRow.Position = UDim2.new(0, 12, 0, 44)
+	switchRow.BackgroundColor3 = Theme.Header
+	switchRow.BorderSizePixel = 0
+	switchRow.Parent = panel
+	switchRow.ZIndex = 52
+	UIFactory.corner(switchRow, 4)
+	UIFactory.stroke(switchRow, Theme.Border, 1)
+
+	local switchLabel = UIFactory.label({
+		Parent = switchRow,
+		Position = UDim2.new(0, 10, 0, 0),
+		Size = UDim2.new(1, -60, 1, 0),
+		Text = "View Camera",
+		Font = Enum.Font.GothamBold,
+		TextSize = 12,
+		Color = Theme.Text,
+		ZIndex = 53,
+	})
+
+	local switchTrack = Instance.new("Frame")
+	switchTrack.Name = "Track"
+	switchTrack.Size = UDim2.new(0, 36, 0, 18)
+	switchTrack.Position = UDim2.new(1, -46, 0.5, -9)
+	switchTrack.BackgroundColor3 = Theme.PanelDark
+	switchTrack.BorderSizePixel = 0
+	switchTrack.Parent = switchRow
+	switchTrack.ZIndex = 53
+	UIFactory.corner(switchTrack, 9)
+	UIFactory.stroke(switchTrack, Theme.Border, 1)
+
+	local knob = Instance.new("Frame")
+	knob.Name = "Knob"
+	knob.Size = UDim2.new(0, 14, 0, 14)
+	knob.Position = UDim2.new(0, 2, 0.5, -7)
+	knob.BackgroundColor3 = Theme.TextDim
+	knob.BorderSizePixel = 0
+	knob.Parent = switchTrack
+	knob.ZIndex = 54
+	UIFactory.corner(knob, 7)
+
+	self.viewToggle = {
+		row = switchRow,
+		track = switchTrack,
+		knob = knob,
+		on = false,
+		callback = nil,
+		button = switchRow,
+	}
+
 	local function rowBtn(name, text, color, yOffset)
 		local b = Instance.new("TextButton")
 		b.Name = name
@@ -178,7 +225,6 @@ function module:buildCamerasModal()
 		b.ZIndex = 52
 		UIFactory.corner(b, 4)
 		UIFactory.stroke(b, Theme.Border, 1)
-		-- hover/press
 		local def = b.BackgroundColor3
 		local hov = def:Lerp(Color3.new(1,1,1), 0.12)
 		local prs = def:Lerp(Color3.new(0,0,0), 0.08)
@@ -197,23 +243,17 @@ function module:buildCamerasModal()
 		return b
 	end
 
-	self.camerasPanel = self
-	self.camerasPanel.modalPanel   = panel
-	self.camerasPanel.modalBackdrop = backdrop
-	self.camerasPanel.viewButton   = rowBtn("ViewCamera",  "View Camera",  Theme.Panel,      44)
-	self.camerasPanel.addCamButton = rowBtn("AddCamera",   "Add Camera",   Theme.Accent,     82)
-	self.camerasPanel.editButton   = rowBtn("EditCamera",  "Edit Camera",  Theme.Panel,      120)
+	self.modalPanel    = panel
+	self.modalBackdrop = backdrop
+	self.addCamButton  = rowBtn("AddCamera",  "Add Camera",  Theme.Accent, 90)
+	self.editButton    = rowBtn("EditCamera", "Edit Camera", Theme.Panel,  132)
 
-	-- Hidden until opened
 	panel.Visible = false
 	self.modalOpen = false
 
-	-- Launcher opens the modal
 	self.camerasButton.MouseButton1Click:Connect(function()
 		self:openCamerasModal()
 	end)
-
-	-- Close interactions
 	closeBtn.MouseButton1Click:Connect(function() self:closeCamerasModal() end)
 	backdrop.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -223,14 +263,31 @@ function module:buildCamerasModal()
 	end)
 end
 
+function module:setViewToggle(on, callback)
+	local t = self.viewToggle
+	if not t then return end
+	t.on = on and true or false
+	if callback ~= nil then t.callback = callback end
+
+	TweenService:Create(t.knob, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Position = t.on and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7),
+		BackgroundColor3 = t.on and Theme.Accent or Theme.TextDim,
+	}):Play()
+	TweenService:Create(t.track, TweenInfo.new(0.18), {
+		BackgroundColor3 = t.on and Theme.Accent:Lerp(Theme.Background, 0.6) or Theme.PanelDark,
+	}):Play()
+end
+
 function module:openCamerasModal()
 	if self.modalOpen then return end
 	self.modalOpen = true
+	self:repositionModal()
 	self.modalBackdrop.Visible = true
 	self.modalPanel.Visible = true
 	self.modalBackdrop.BackgroundTransparency = 0.55
+	self.modalPanel.Position = self.modalPanel.Position + UDim2.new(0, 0, 0, -6)
 	TweenService:Create(self.modalPanel, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Position = UDim2.new(0.5, -120, 0.5, -85)
+		Position = self._modalTargetPos
 	}):Play()
 end
 
@@ -238,16 +295,36 @@ function module:closeCamerasModal()
 	if not self.modalOpen then return end
 	self.modalOpen = false
 	TweenService:Create(self.modalBackdrop, TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
+	local current = self.modalPanel.Position
 	TweenService:Create(self.modalPanel, TweenInfo.new(0.15), {
-		Position = UDim2.new(0.5, -110, 0.5, -75)
+		Position = current + UDim2.new(0, 0, 0, -6)
 	}):Play()
 	task.delay(0.16, function()
 		if not self.modalOpen then
 			self.modalPanel.Visible = false
 			self.modalBackdrop.Visible = false
-			self.modalPanel.Position = UDim2.new(0.5, -120, 0.5, -85)
 		end
 	end)
+end
+
+function module:repositionModal()
+	local btn = self.camerasButton
+	local btnAbs = btn.AbsolutePosition
+	local btnSize = btn.AbsoluteSize
+	local panel = self.modalPanel
+
+	panel.Size = UDim2.new(0, 240, 0, 200)
+
+	local desiredX = btnAbs.X + btnSize.X - 240
+	local desiredY = btnAbs.Y + btnSize.Y + 6
+
+	local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize
+		or Vector2.new(panel.Parent.AbsoluteSize.X, panel.Parent.AbsoluteSize.Y)
+	desiredX = math.clamp(desiredX, 8, math.max(8, viewport.X - 248))
+	desiredY = math.clamp(desiredY, 8, math.max(8, viewport.Y - 208))
+
+	self._modalTargetPos = UDim2.new(0, desiredX, 0, desiredY)
+	panel.Position = self._modalTargetPos
 end
 
 function module:buildTimelinePanel()
@@ -317,11 +394,27 @@ function module:buildTimelinePanel()
 	})
 	UIFactory.stroke(self.area, Theme.Border, 1, 0.6)
 
-	self:buildRuler()
-	self:buildTrack()
-	self:buildPlayhead()
+	self.tracksList = Instance.new("ScrollingFrame")
+	self.tracksList.Name = "TracksList"
+	self.tracksList.Size = UDim2.new(1, -16, 1, -28)
+	self.tracksList.Position = UDim2.new(0, 8, 0, 26)
+	self.tracksList.BackgroundTransparency = 1
+	self.tracksList.BorderSizePixel = 0
+	self.tracksList.ScrollBarThickness = 4
+	self.tracksList.ScrollBarImageColor3 = Theme.Accent
+	self.tracksList.CanvasSize = UDim2.new(0, 0, 0, 0)
+	self.tracksList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	self.tracksList.Parent = self.area
+	self.tracksList.ZIndex = 12
 
-	return panel
+	local layout = Instance.new("UIListLayout")
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Padding = UDim.new(0, 4)
+	layout.Parent = self.tracksList
+	layout.FillDirection = Enum.FillDirection.Vertical
+
+	self:buildRuler()
+	self:buildPlayhead()
 end
 
 function module:buildRuler()
@@ -331,15 +424,13 @@ function module:buildRuler()
 		Position = UDim2.new(0, 8, 0, 4),
 		Color = Theme.PanelDark,
 		Name = "Ruler",
-		ZIndex = 12,
+		ZIndex = 30,
 	})
 	ruler.BackgroundTransparency = 1
 
 	local maxTime = Config.MaxTime or 10
-
 	for i = 0, maxTime do
 		local xPos = i / maxTime
-
 		local marker = Instance.new("Frame")
 		marker.Size = UDim2.new(0, 1, 0, 12)
 		marker.Position = UDim2.new(xPos, 0, 0, 6)
@@ -347,7 +438,7 @@ function module:buildRuler()
 		marker.BackgroundTransparency = 0.3
 		marker.BorderSizePixel = 0
 		marker.Parent = ruler
-		marker.ZIndex = 13
+		marker.ZIndex = 31
 
 		UIFactory.label({
 			Parent = marker,
@@ -358,9 +449,8 @@ function module:buildRuler()
 			TextSize = 9,
 			Color = Theme.TextMuted,
 			XAlign = Enum.TextXAlignment.Center,
-			ZIndex = 13,
+			ZIndex = 31,
 		})
-
 		if i < maxTime then
 			local sub = Instance.new("Frame")
 			sub.Size = UDim2.new(0, 1, 0, 6)
@@ -369,104 +459,8 @@ function module:buildRuler()
 			sub.BackgroundTransparency = 0.7
 			sub.BorderSizePixel = 0
 			sub.Parent = ruler
-			sub.ZIndex = 13
+			sub.ZIndex = 31
 		end
-	end
-end
-
-function module:buildTrack()
-	self.track = UIFactory.frame({
-		Parent = self.area,
-		Size = UDim2.new(1, -16, 0, 36),
-		Position = UDim2.new(0, 8, 0, 32),
-		Color = Theme.Panel,
-		Corner = 4,
-		Name = "KeyframeTrack",
-		ZIndex = 12,
-		Gradient = ColorSequence.new{
-			ColorSequenceKeypoint.new(0, Theme.Panel),
-			ColorSequenceKeypoint.new(1, Theme.Panel:Lerp(Theme.Background, 0.3))
-		},
-		GradientRotation = 90,
-	})
-	UIFactory.stroke(self.track, Theme.Border, 1, 0.5)
-
-	UIFactory.label({
-		Parent = self.track,
-		Position = UDim2.new(0, 14, 0, 0),
-		Size = UDim2.new(0, 90, 1, 0),
-		Text = "Camera",
-		Font = Enum.Font.GothamBold,
-		TextSize = 11,
-		Color = Theme.TextDim,
-		ZIndex = 13,
-	})
-
-	self.keyframeContainer = Instance.new("Frame")
-	self.keyframeContainer.Name = "Keyframes"
-	self.keyframeContainer.Size = UDim2.new(1, -110, 1, 0)
-	self.keyframeContainer.Position = UDim2.new(0, 100, 0, 0)
-	self.keyframeContainer.BackgroundTransparency = 1
-	self.keyframeContainer.Parent = self.track
-	self.keyframeContainer.ZIndex = 13
-
-	self:renderKeyframes({0, 2.5, 5, 7.5, 10})
-end
-
-function module:renderKeyframes(keyframeTimes)
-	for _, child in ipairs(self.keyframeContainer:GetChildren()) do
-		if child:IsA("Frame") then child:Destroy() end
-	end
-
-	local maxTime = Config.MaxTime or 10
-
-	for _, time in ipairs(keyframeTimes) do
-		local xPos = time / maxTime
-
-		local guide = Instance.new("Frame")
-		guide.Size = UDim2.new(0, 1, 1, 8)
-		guide.Position = UDim2.new(xPos, 0, 0, -4)
-		guide.BackgroundColor3 = Theme.Accent or Theme.Playhead
-		guide.BackgroundTransparency = 0.85
-		guide.BorderSizePixel = 0
-		guide.Parent = self.keyframeContainer
-		guide.ZIndex = 13
-
-		local diamond = Instance.new("Frame")
-		diamond.Name = "Keyframe_" .. tostring(time)
-		diamond.Size = UDim2.new(0, 10, 0, 10)
-		diamond.Position = UDim2.new(xPos, -5, 0.5, -5)
-		diamond.BackgroundColor3 = Theme.Accent or Theme.Playhead
-		diamond.BorderSizePixel = 0
-		diamond.Rotation = 45
-		diamond.Parent = self.keyframeContainer
-		diamond.ZIndex = 14
-
-		local stroke = Instance.new("UIStroke")
-		stroke.Color = Theme.Panel
-		stroke.Thickness = 1.5
-		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-		stroke.Parent = diamond
-
-		local defaultSize = diamond.Size
-		local hoverSize = UDim2.new(0, 14, 0, 14)
-
-		diamond.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseMovement then
-				game:GetService("TweenService"):Create(diamond, TweenInfo.new(0.15), {
-					Size = hoverSize,
-					Position = UDim2.new(xPos, -7, 0.5, -7)
-				}):Play()
-			end
-		end)
-		diamond.InputEnded:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseMovement then
-				game:GetService("TweenService"):Create(diamond, TweenInfo.new(0.15), {
-					Size = defaultSize,
-					Position = UDim2.new(xPos, -5, 0.5, -5)
-				}):Play()
-			end
-		end)
 	end
 end
 
@@ -478,12 +472,7 @@ function module:buildPlayhead()
 	self.playheadLine.BackgroundColor3 = Theme.Playhead
 	self.playheadLine.BorderSizePixel = 0
 	self.playheadLine.Parent = self.area
-	self.playheadLine.ZIndex = 20
-
-	local dashPattern = Instance.new("Frame")
-	dashPattern.Size = UDim2.new(1, 0, 1, 0)
-	dashPattern.BackgroundTransparency = 1
-	dashPattern.Parent = self.playheadLine
+	self.playheadLine.ZIndex = 40
 
 	self.playhead = UIFactory.frame({
 		Parent = self.playheadLine,
@@ -491,17 +480,8 @@ function module:buildPlayhead()
 		Position = UDim2.new(0.5, -7, 0, -7),
 		Color = Theme.Playhead,
 		Corner = 3,
-		ZIndex = 21,
+		ZIndex = 41,
 	})
-
-	UIFactory.frame({
-		Parent = self.playhead,
-		Size = UDim2.new(1, 4, 1, 4),
-		Position = UDim2.new(0, -2, 0, -2),
-		Color = Color3.new(0, 0, 0),
-		Corner = 4,
-		ZIndex = 20,
-	}).BackgroundTransparency = 0.85
 
 	local triangle = Instance.new("Frame")
 	triangle.Size = UDim2.new(0, 8, 0, 8)
@@ -510,7 +490,7 @@ function module:buildPlayhead()
 	triangle.BorderSizePixel = 0
 	triangle.Rotation = 45
 	triangle.Parent = self.playhead
-	triangle.ZIndex = 22
+	triangle.ZIndex = 42
 
 	local bottomHandle = UIFactory.frame({
 		Parent = self.playheadLine,
@@ -518,7 +498,7 @@ function module:buildPlayhead()
 		Position = UDim2.new(0.5, -7, 1, -7),
 		Color = Theme.Playhead,
 		Corner = 3,
-		ZIndex = 21,
+		ZIndex = 41,
 	})
 	bottomHandle.Rotation = 180
 
@@ -529,7 +509,195 @@ function module:buildPlayhead()
 	bottomTriangle.BorderSizePixel = 0
 	bottomTriangle.Rotation = 45
 	bottomTriangle.Parent = bottomHandle
-	bottomTriangle.ZIndex = 22
+	bottomTriangle.ZIndex = 42
+end
+
+function module:ensureTrack(cameraName)
+	if self.tracks[cameraName] then return self.tracks[cameraName] end
+
+	local row = Instance.new("Frame")
+	row.Name = "Track_" .. cameraName
+	row.Size = UDim2.new(1, -8, 0, 36)
+	row.BackgroundColor3 = Theme.Panel
+	row.BorderSizePixel = 0
+	row.LayoutOrder = #self.tracks + 1
+	row.Parent = self.tracksList
+	row.ZIndex = 12
+	UIFactory.corner(row, 4)
+	UIFactory.stroke(row, Theme.Border, 1, 0.5)
+
+	row.BackgroundColor3 = Theme.Panel
+	local grad = Instance.new("UIGradient")
+	grad.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Theme.Panel),
+		ColorSequenceKeypoint.new(1, Theme.Panel:Lerp(Theme.Background, 0.3)),
+	}
+	grad.Rotation = 90
+	grad.Parent = row
+
+	local label = UIFactory.label({
+		Parent = row,
+		Position = UDim2.new(0, 10, 0, 0),
+		Size = UDim2.new(0, 90, 1, 0),
+		Text = cameraName,
+		Font = Enum.Font.GothamBold,
+		TextSize = 11,
+		Color = Theme.TextDim,
+		ZIndex = 13,
+	})
+
+	local kfContainer = Instance.new("Frame")
+	kfContainer.Name = "Keyframes"
+	kfContainer.Size = UDim2.new(1, -110, 1, 0)
+	kfContainer.Position = UDim2.new(0, 100, 0, 0)
+	kfContainer.BackgroundTransparency = 1
+	kfContainer.ClipsDescendants = true
+	kfContainer.Parent = row
+	kfContainer.ZIndex = 13
+
+	local track = {
+		row = row,
+		label = label,
+		keyframesContainer = kfContainer,
+		keyframes = {},
+		activeKeyframe = nil,
+	}
+	self.tracks[cameraName] = track
+	return track
+end
+
+function module:setActiveCamera(cameraName)
+	self.activeCameraName = cameraName
+	for name, tr in pairs(self.tracks) do
+		local highlight = (name == cameraName)
+		tr.row.BackgroundColor3 = highlight
+			and Theme.Panel:Lerp(Theme.Accent, 0.12)
+			or Theme.Panel
+	end
+end
+
+function module:renderKeyframes(keyframeTimes)
+	for _, tr in pairs(self.tracks) do
+		for _, kf in ipairs(tr.keyframes) do
+			if kf.diamond and kf.diamond.Parent then kf.diamond:Destroy() end
+			if kf.guide and kf.guide.Parent then kf.guide:Destroy() end
+		end
+		tr.keyframes = {}
+	end
+
+	for name, _ in pairs(self.tracks) do
+		for _, t in ipairs(keyframeTimes) do
+			self:createKeyframeVisual(name, t)
+		end
+	end
+end
+
+function module:createKeyframeVisual(cameraName, time)
+	local track = self:ensureTrack(cameraName)
+	local maxTime = Config.MaxTime or 10
+	local xPos = (time or 0) / maxTime
+
+	local guide = Instance.new("Frame")
+	guide.Size = UDim2.new(0, 1, 1, 8)
+	guide.Position = UDim2.new(xPos, 0, 0, -4)
+	guide.BackgroundColor3 = Theme.Accent or Theme.Playhead
+	guide.BackgroundTransparency = 0.85
+	guide.BorderSizePixel = 0
+	guide.Parent = track.keyframesContainer
+	guide.ZIndex = 13
+
+	local diamond = Instance.new("Frame")
+	diamond.Name = "Keyframe_" .. tostring(time)
+	diamond.Size = UDim2.new(0, 12, 0, 12)
+	diamond.Position = UDim2.new(xPos, -6, 0.5, -6)
+	diamond.BackgroundColor3 = Theme.Keyframe or Theme.Accent or Theme.Playhead
+	diamond.BorderSizePixel = 0
+	diamond.Rotation = 45
+	diamond.Parent = track.keyframesContainer
+	diamond.ZIndex = 14
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Theme.Panel
+	stroke.Thickness = 1.5
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Parent = diamond
+
+	local record = {
+		time = time,
+		diamond = diamond,
+		guide = guide,
+		expanded = false,
+		active = false,
+	}
+	track.keyframes[#track.keyframes + 1] = record
+
+	local defaultSize = diamond.Size
+	local hoverSize = UDim2.new(0, 16, 0, 16)
+	diamond.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			TweenService:Create(diamond, TweenInfo.new(0.15), {
+				Size = hoverSize,
+				Position = UDim2.new(xPos, -8, 0.5, -8),
+			}):Play()
+		end
+	end)
+	diamond.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			TweenService:Create(diamond, TweenInfo.new(0.15), {
+				Size = record.expanded and UDim2.new(0, 18, 0, 18) or defaultSize,
+				Position = UDim2.new(
+					xPos,
+					record.expanded and -9 or -6,
+					0.5,
+					record.expanded and -9 or -6
+				),
+			}):Play()
+		end
+	end)
+
+	return record
+end
+
+function module:removeKeyframeVisual(cameraName, time)
+	local track = self.tracks[cameraName]
+	if not track then return end
+	for i, kf in ipairs(track.keyframes) do
+		if math.abs(kf.time - time) < 1e-4 then
+			if kf.diamond and kf.diamond.Parent then kf.diamond:Destroy() end
+			if kf.guide and kf.guide.Parent then kf.guide:Destroy() end
+			table.remove(track.keyframes, i)
+			return true
+		end
+	end
+	return false
+end
+
+function module:updatePlayheadProximity(time, pixelPos)
+	local maxTime = Config.MaxTime or 10
+	local threshold = 6
+	for _, track in pairs(self.tracks) do
+		for _, kf in ipairs(track.keyframes) do
+			local kfX = (kf.time / maxTime) * (self.area.AbsoluteSize.X - 16) + 8
+			local dist = math.abs(pixelPos - kfX)
+			local shouldExpand = dist < threshold
+			if shouldExpand ~= kf.expanded then
+				kf.expanded = shouldExpand
+				if shouldExpand then
+					TweenService:Create(kf.diamond, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+						Size = UDim2.new(0, 18, 0, 18),
+						Position = UDim2.new(kf.time / maxTime, -9, 0.5, -9),
+						BackgroundColor3 = Theme.Playhead,
+					}):Play()
+				else
+					TweenService:Create(kf.diamond, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						Size = UDim2.new(0, 12, 0, 12),
+						Position = UDim2.new(kf.time / maxTime, -6, 0.5, -6),
+						BackgroundColor3 = Theme.Keyframe or Theme.Accent or Theme.Playhead,
+					}):Play()
+				end
+			end
+		end
+	end
 end
 
 function module:createControlButton(index, text, color, callback)
@@ -578,6 +746,8 @@ function module:setPlayheadPosition(time)
 	local totalMins = math.floor(maxTime / 60)
 	local totalSecs = math.floor(maxTime % 60)
 	self.timeLabel.Text = string.format("%02d:%02d / %02d:%02d", mins, secs, totalMins, totalSecs)
+
+	self:updatePlayheadProximity(clampedTime, pixelPos)
 end
 
 return module
