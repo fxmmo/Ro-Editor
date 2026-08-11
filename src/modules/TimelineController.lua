@@ -55,14 +55,19 @@ function module:activeCam()
 end
 
 function module:setupModeButtons()
+	-- Buttons now live inside the Cameras modal (see Interface.lua).
+	local modal = self.ui.modalPanel
 	self.ui.editButton.MouseButton1Click:Connect(function()
 		self:toggleEditMode()
+		self.ui:closeCamerasModal()
 	end)
 	self.ui.viewButton.MouseButton1Click:Connect(function()
 		self:toggleCameraMode()
+		self.ui:closeCamerasModal()
 	end)
 	self.ui.addCamButton.MouseButton1Click:Connect(function()
 		self:addCamera()
+		self.ui:closeCamerasModal()
 	end)
 end
 
