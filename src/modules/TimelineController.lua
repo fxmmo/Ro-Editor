@@ -43,6 +43,13 @@ function module.new(interface, store, handles)
 	self.lastCam = nil
 	self.storeByCamera = {}
 	self.connections = {}
+	self.ui.onTrackSelected = function(cameraName)
+		self:selectCamera(cameraName)
+	end
+	self.ui.onKeyframeSelected = function(cameraName, data)
+		self:selectKeyframe(cameraName, data)
+	end
+	self.handles:show(false)
 	self:setupButtons()
 	self:setupTimelineInput()
 	self:setupModeButtons()
@@ -112,6 +119,10 @@ function module:selectCamera(cameraName)
 	if not entry then return end
 	self.lastCam = entry
 	self.ui:setActiveCamera(cameraName)
+	if self.editMode then
+		self.handles:setTarget(entry.part)
+		self.handles:show(true)
+	end
 	if self.cameraMode then
 		workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
 		workspace.CurrentCamera = entry.camera
@@ -135,7 +146,7 @@ function module:_applyCameraMode()
 	if self.cameraMode then
 		workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
 		if self.lastCam then
-			local camData = CameraResolver.get(self.lastCam.Name)
+			local camData = CameraResolver.get(self.lastCam.name)
 			if camData and camData.camera then
 				workspace.CurrentCamera = camData.camera
 			end
@@ -217,19 +228,17 @@ function module:addKeyframe()
 	data.frame = record.diamond
 	record.data = data
 
-	record.diamond.MouseButton1Click:Connect(function()
-		self:selectKeyframe(camName, data)
-	end)
-
 	self.addBtn.BackgroundColor3 = Theme.Success
 	task.delay(0.2, function() self.addBtn.BackgroundColor3 = Theme.Panel end)
 end
 
 function module:selectKeyframe(camName, data)
+	self:selectCamera(camName)
 	local store = self:storeFor(camName)
 	store:setSelected(data)
 	self.currentTime = data.time
-
+	self.isPlaying = false
+	self:updatePlayhead()
 	self:tweenCameraTo(data.cframe)
 end
 
