@@ -1,8 +1,36 @@
-local Dev = loadstring(game:HttpGet("https://raw.githubusercontent.com/fxmmo/Nightfall-Storage/refs/heads/main/utils/modules/dev.lua"))()
-local KeyframeStore = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/KeyframeStore.lua") or error("[Ro-Editor] import failed") or error("[Ro-Editor] Failed to import KeyframeStore (HTTP or loader error)")
-local HandleSystem = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/HandleSystem.lua") or error("[Ro-Editor] import failed") or error("[Ro-Editor] Failed to import HandleSystem (HTTP or loader error)")
-local Interface = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/Interface.lua") or error("[Ro-Editor] import failed") or error("[Ro-Editor] Failed to import Interface (HTTP or loader error)")
-local TimelineController = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/TimelineController.lua") or error("[Ro-Editor] import failed") or error("[Ro-Editor] Failed to import TimelineController (HTTP or loader error)")
+local http = game:GetService("HttpService")
+
+local _cache = {}
+local Dev = {}
+
+function Dev:Import(url)
+	if _cache[url] then
+		return _cache[url]
+	end
+	local ok, result = pcall(function()
+		return loadstring(game:HttpGet(url))()
+	end)
+	if ok and result then
+		_cache[url] = result
+		return result
+	end
+	return nil
+end
+
+local function import(url, name)
+	local mod = Dev:Import(url)
+	if not mod then
+		error("[Ro-Editor] Failed to import " .. name .. " (HTTP or loader error)")
+	end
+	return mod
+end
+
+local BASE = "https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/"
+
+local KeyframeStore = import(BASE .. "modules/KeyframeStore.lua", "KeyframeStore")
+local HandleSystem = import(BASE .. "modules/HandleSystem.lua", "HandleSystem")
+local Interface = import(BASE .. "modules/Interface.lua", "Interface")
+local TimelineController = import(BASE .. "modules/TimelineController.lua", "TimelineController")
 
 local System = {}
 System.__index = System
