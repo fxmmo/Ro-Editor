@@ -41,6 +41,7 @@ function module.new(interface, store, handles)
 	self.editMode = false
 	self.cameraMode = false
 	self.lastCam = nil
+	self.storeByCamera = {}
 	self.connections = {}
 	self:setupButtons()
 	self:setupTimelineInput()
@@ -54,20 +55,39 @@ function module:activeCam()
 	return CameraResolver.get(self.lastCam.name)
 end
 
+function module:storeFor(cameraName)
+	if not self.storeByCamera[cameraName] then
+		self.storeByCamera[cameraName] = (loadstring and loadstring or function() end)("return {}") and nil
+	end
+	if not self.storeByCamera[cameraName] then
+		self.storeByCamera[cameraName] = setmetatable({keyframes = {}, selected = nil}, {__index = self.store})
+	end
+	return self.storeByCamera[cameraName]
+end
+
 function module:setupModeButtons()
-	-- Buttons now live inside the Cameras modal (see Interface.lua).
-	local modal = self.ui.modalPanel
 	self.ui.editButton.MouseButton1Click:Connect(function()
 		self:toggleEditMode()
-		self.ui:closeCamerasModal()
-	end)
-	self.ui.viewButton.MouseButton1Click:Connect(function()
-		self:toggleCameraMode()
 		self.ui:closeCamerasModal()
 	end)
 	self.ui.addCamButton.MouseButton1Click:Connect(function()
 		self:addCamera()
 		self.ui:closeCamerasModal()
+	end)
+
+	self.ui:setViewToggle(false, function(on)
+		self.cameraMode = on and true or false
+		self:_applyCameraMode()
+	end)
+	local viewRow = self.ui.viewToggle.row
+	viewRow.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			self.ui:setViewToggle(not self.ui.viewToggle.on)
+			if self.ui.viewToggle.callback then
+				self.ui.viewToggle.callback(self.ui.viewToggle.on)
+			end
+		end
 	end)
 end
 
@@ -77,13 +97,17 @@ function module:addCamera()
 	local camData = CameraResolver.createCam({
 		Name = name,
 		CFrame = CFrame.new(0, 5, 10),
-		FieldOfView = 70
+		FieldOfView = 70,
 	})
 
 	if not camData then
 		return nil
 	end
 	self.lastCam = camData
+
+	self.ui:ensureTrack(name)
+	self.ui:setActiveCamera(name)
+	self:_refreshTimelineHeight()
 end
 
 function module:toggleEditMode()
@@ -91,18 +115,15 @@ function module:toggleEditMode()
 	if not entry then
 		self.editMode = false
 		self.handles:show(false)
-		self.ui.editButton.BackgroundColor3 = Theme.Panel
 		return
 	end
 
 	self.editMode = not self.editMode
 	self.handles:setTarget(entry.part)
 	self.handles:show(self.editMode)
-	self.ui.editButton.BackgroundColor3 = self.editMode and Theme.Accent or Theme.Panel
 end
 
-function module:toggleCameraMode()
-	self.cameraMode = not self.cameraMode
+function module:_applyCameraMode()
 	if self.cameraMode then
 		workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
 		if self.lastCam then
@@ -111,22 +132,34 @@ function module:toggleCameraMode()
 				workspace.CurrentCamera = camData.camera
 			end
 		end
-		self.ui.viewButton.BackgroundColor3 = Theme.Accent
 	else
 		workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
 		if Players.LocalPlayer.Character then
 			workspace.CurrentCamera.CameraSubject = Players.LocalPlayer.Character
 		end
-		self.ui.viewButton.BackgroundColor3 = Theme.Panel
+	end
+end
+
+function module:_refreshTimelineHeight()
+	local count = 0
+	for _ in pairs(self.ui.tracks) do count += 1 end
+	local rowH = 36
+	local pad = 4
+	local desired = math.clamp(count * (rowH + pad) + 28, 160, 280)
+	self.ui.timelinePanel = self.ui.timelinePanel
+	local panel = self.ui.gui:FindFirstChild("TimelinePanel")
+	if panel then
+		panel.Size = UDim2.new(1, 0, 0, desired)
+		panel.Position = UDim2.new(0, 0, 1, -desired)
 	end
 end
 
 function module:setupButtons()
-	self.playBtn = self.ui:createControlButton(1, "▶", Theme.Panel, function() self:play() end)
-	self.pauseBtn = self.ui:createControlButton(2, "⏸", Theme.Panel, function() self:pause() end)
-	self.stopBtn = self.ui:createControlButton(3, "⏹", Theme.Panel, function() self:stop() end)
-	self.addBtn = self.ui:createControlButton(4, "＋", Theme.Panel, function() self:addKeyframe() end)
-	self.deleteBtn = self.ui:createControlButton(5, "✕", Theme.Panel, function() self:deleteSelected() end)
+	self.playBtn   = self.ui:createControlButton(1, "▶", Theme.Panel,   function() self:play()  end)
+	self.pauseBtn  = self.ui:createControlButton(2, "⏸", Theme.Panel,   function() self:pause() end)
+	self.stopBtn   = self.ui:createControlButton(3, "⏹", Theme.Panel,   function() self:stop()  end)
+	self.addBtn    = self.ui:createControlButton(4, "＋", Theme.Panel,  function() self:addKeyframe() end)
+	self.deleteBtn = self.ui:createControlButton(5, "✕", Theme.Panel,   function() self:deleteKeyframe() end)
 end
 
 function module:play()
@@ -152,51 +185,50 @@ function module:addKeyframe()
 	local entry = self:activeCam()
 	if not entry or not entry.part then return end
 
+	local time = self.currentTime
+	local camName = self.lastCam.name
+	local store = self:storeFor(camName)
+
+	for _, kf in ipairs(store.keyframes) do
+		if math.abs(kf.time - time) < 1e-4 then
+			self.addBtn.BackgroundColor3 = Theme.Warning
+			task.delay(0.2, function() self.addBtn.BackgroundColor3 = Theme.Panel end)
+			return
+		end
+	end
+
 	local data = {
-		time = self.currentTime,
+		time = time,
 		position = entry.part.Position,
 		orientation = entry.part.Orientation,
 		cframe = entry.part.CFrame,
+		cameraName = camName,
 	}
-	self:createKeyframeVisual(data)
-	self.store:add(data)
+	store:add(data)
+
+	local record = self.ui:createKeyframeVisual(camName, time)
+	data.frame = record.diamond
+	record.data = data
+
+	record.diamond.MouseButton1Click:Connect(function()
+		self:selectKeyframe(camName, data)
+	end)
 
 	self.addBtn.BackgroundColor3 = Theme.Success
-	task.delay(0.2, function()
-		self.addBtn.BackgroundColor3 = Theme.Panel
-	end)
+	task.delay(0.2, function() self.addBtn.BackgroundColor3 = Theme.Panel end)
 end
 
-function module:createKeyframeVisual(data)
-	local kf = Instance.new("TextButton")
-	kf.Name = "Keyframe"
-	kf.Size = UDim2.new(0, 12, 0, 20)
-	kf.Position = UDim2.new(data.time / Config.MaxTime, -6, 0.5, -10)
-	kf.BackgroundColor3 = Theme.Keyframe
-	kf.BorderSizePixel = 0
-	kf.Text = ""
-	kf.ZIndex = 5
-	kf.Parent = self.ui.track
-	UIFactory.corner(kf, 2)
-	UIFactory.stroke(kf, Theme.Border, 1)
-
-	data.frame = kf
-
-	kf.MouseButton1Click:Connect(function()
-		self:selectKeyframe(data)
-	end)
-end
-
-function module:selectKeyframe(data)
-	self.store:setSelected(data)
+function module:selectKeyframe(camName, data)
+	local store = self:storeFor(camName)
+	store:setSelected(data)
 	self.currentTime = data.time
 
-	for _, kf in ipairs(self.store.keyframes) do
-		if kf.frame then
+	for _, kf in ipairs(store.keyframes) do
+		if kf.frame and kf.frame.Parent then
 			kf.frame.BackgroundColor3 = Theme.Keyframe
 		end
 	end
-	if data.frame then
+	if data.frame and data.frame.Parent then
 		data.frame.BackgroundColor3 = Theme.KeyframeSelected
 	end
 
@@ -222,25 +254,45 @@ function module:tweenCameraTo(targetCFrame)
 	end)
 end
 
-function module:deleteSelected()
-	local selected = self.store:getSelected()
-	if not selected then return end
-	self.store:remove(selected)
+function module:deleteKeyframe()
+	if not self.lastCam then return end
+	local camName = self.lastCam.name
+	local store = self:storeFor(camName)
+	local selected = store:getSelected()
+
+	if not selected then
+		local best, bestDist = nil, math.huge
+		for _, kf in ipairs(store.keyframes) do
+			local d = math.abs(kf.time - self.currentTime)
+			if d < bestDist then best, bestDist = kf, d end
+		end
+		selected = best
+	end
+
+	if not selected then
+		self.deleteBtn.BackgroundColor3 = Theme.Danger
+		task.delay(0.2, function() self.deleteBtn.BackgroundColor3 = Theme.Panel end)
+		return
+	end
+
+	self.ui:removeKeyframeVisual(camName, selected.time)
+	store:remove(selected)
+
 	self.deleteBtn.BackgroundColor3 = Theme.Danger
-	task.delay(0.2, function()
-		self.deleteBtn.BackgroundColor3 = Theme.Panel
-	end)
+	task.delay(0.2, function() self.deleteBtn.BackgroundColor3 = Theme.Panel end)
 end
 
 function module:setupTimelineInput()
 	self.ui.area.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
 			self.isDraggingPlayhead = true
 		end
 	end)
 
 	self.connections.InputEnded = UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
 			self.isDraggingPlayhead = false
 			self.handles:stopDrag()
 		end
@@ -248,10 +300,14 @@ function module:setupTimelineInput()
 end
 
 function module:updateCameraByTime()
-	local entry = self:activeCam()
-	if not entry or self.store:count() == 0 then return end
+	if not self.lastCam then return end
+	local store = self:storeFor(self.lastCam.name)
+	if store:count() == 0 then return end
 
-	local prevKf, nextKf = self.store:findNeighbors(self.currentTime)
+	local entry = self:activeCam()
+	if not entry then return end
+
+	local prevKf, nextKf = store:findNeighbors(self.currentTime)
 	if prevKf and nextKf then
 		local span = nextKf.time - prevKf.time
 		local alpha = span > 0 and (self.currentTime - prevKf.time) / span or 0
@@ -306,9 +362,11 @@ function module:startLoop()
 
 		if self.cameraMode then
 			local entry = self:activeCam()
-			local camCFrame = CameraResolver.getCFrame(entry)
-			if camCFrame then
-				workspace.CurrentCamera.CFrame = camCFrame
+			if entry then
+				local camCFrame = CameraResolver.getCFrame(entry)
+				if camCFrame then
+					workspace.CurrentCamera.CFrame = camCFrame
+				end
 			end
 		end
 
@@ -319,14 +377,10 @@ end
 
 function module:destroy()
 	for _, connection in pairs(self.connections) do
-		if connection then
-			connection:Disconnect()
-		end
+		if connection then connection:Disconnect() end
 	end
 	self.connections = {}
-	if self.handles then
-		self.handles:destroy()
-	end
+	if self.handles then self.handles:destroy() end
 end
 
 return module
