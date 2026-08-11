@@ -1,6 +1,3 @@
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
 local Dev = _G.__RoEditorDev
 if not Dev then
 	local _cache = {}
@@ -52,167 +49,102 @@ local AXIS_DIRECTIONS = {
 function module.new()
 	local self = setmetatable({}, module)
 	self.handles = {}
-	self.activeAxis = nil
-	self.isDragging = false
-	self.hoveredAxis = nil
-	self.lastMouse = Vector2.new()
 	self.selectedTarget = nil
+	self.visible = false
+	self.activeAxis = nil
+	self.dragStartCFrame = nil
+	self.isDragging = false
 	self.connections = {}
 	self:build()
-	self:setupGlobalEvents()
+	self:show(false)
 	return self
 end
 
-function module:setupGlobalEvents()
-	self.connections.InputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-		if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-		if not self.hoveredAxis or not self.selectedTarget then return end
-		self:startDrag(self.hoveredAxis)
-	end)
-
-	self.connections.InputChanged = UserInputService.InputChanged:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-		if input.UserInputType == Enum.UserInputType.MouseMovement and self.isDragging then
-			self:dragUpdate()
-		end
-	end)
-
-	self.connections.InputEnded = UserInputService.InputEnded:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			self:stopDrag()
-		end
-	end)
-
-	RunService.RenderStepped:Connect(function()
-		if not self.isDragging then
-			self:checkHover()
-		end
-	end)
+function module:getPlayerGui()
+	local player = game:GetService("Players").LocalPlayer
+	return player and player:FindFirstChildOfClass("PlayerGui")
 end
 
 function module:build()
-	local basePart = Instance.new("Part")
-	basePart.Name = "HandleBase"
-	basePart.Anchored = true
-	basePart.CanCollide = false
-	basePart.CanQuery = false
-	basePart.CanTouch = false
-	basePart.Transparency = 1
-	basePart.Size = Vector3.new(0.1, 0.1, 0.1)
-	basePart.Parent = workspace
-
+	local faces = {
+		X = Faces.new(Enum.NormalId.Left, Enum.NormalId.Right),
+		Y = Faces.new(Enum.NormalId.Bottom, Enum.NormalId.Top),
+		Z = Faces.new(Enum.NormalId.Back, Enum.NormalId.Front),
+	}
+	local directions = {
+		[Enum.NormalId.Left] = Vector3.new(-1, 0, 0),
+		[Enum.NormalId.Right] = Vector3.new(1, 0, 0),
+		[Enum.NormalId.Bottom] = Vector3.new(0, -1, 0),
+		[Enum.NormalId.Top] = Vector3.new(0, 1, 0),
+		[Enum.NormalId.Back] = Vector3.new(0, 0, 1),
+		[Enum.NormalId.Front] = Vector3.new(0, 0, -1),
+	}
 	for axis, color in pairs(AXIS_COLORS) do
-		local handle = Instance.new("Handles")
-		handle.Name = "Handle_" .. axis
-		handle.Style = Enum.HandlesStyle.Movement
-		handle.Color3 = color
-		handle.Transparency = 0.3
-		handle.Adornee = basePart
-		handle.Faces = Faces.new(AXIS_FACES[axis])
-		handle.Parent = basePart
-
-		self.handles[axis] = {
-			handle = handle,
-			base = basePart,
-			color = color,
-			direction = AXIS_DIRECTIONS[axis]
-		}
-	end
-end
-
-function module:checkHover()
-	if not self.selectedTarget or not self.selectedTarget.Parent then
-		self.hoveredAxis = nil
-		return
-	end
-	local mouse = UserInputService:GetMouseLocation()
-	local camera = workspace.CurrentCamera
-	local closest, minDist = nil, math.huge
-	for axis, data in pairs(self.handles) do
-		local worldPos = self.selectedTarget.Position + (data.direction * HANDLE_DISTANCE)
-		local screenPos, onScreen = camera:WorldToScreenPoint(worldPos)
-		if onScreen then
-			local dist = (Vector2.new(screenPos.X, screenPos.Y) - mouse).Magnitude
-			if dist < minDist and dist < 30 then
-				minDist = dist
-				closest = axis
+		local gizmo = Instance.new("Handles")
+		gizmo.Name = "CameraHandle_" .. axis
+		gizmo.Style = Enum.HandlesStyle.Movement
+		gizmo.Color3 = color
+		gizmo.Transparency = 0.15
+		gizmo.Faces = faces[axis]
+		self.connections[axis .. "Down"] = gizmo.MouseButton1Down:Connect(function()
+			if not self.visible or not self.selectedTarget or not self.selectedTarget.Parent then return end
+			self.activeAxis = axis
+			self.dragStartCFrame = self.selectedTarget.CFrame
+			self.isDragging = true
+		end)
+		self.connections[axis .. "Drag"] = gizmo.MouseDrag:Connect(function(face, distance)
+			if not self.isDragging or self.activeAxis ~= axis or not self.selectedTarget or not self.dragStartCFrame then return end
+			local direction = directions[face]
+			if not direction then return end
+			self.selectedTarget.CFrame = self.dragStartCFrame + direction * distance
+			local childCamera = self.selectedTarget:FindFirstChildOfClass("Camera")
+			if childCamera then
+				childCamera.CFrame = self.selectedTarget.CFrame
 			end
-		end
+		end)
+		self.connections[axis .. "Up"] = gizmo.MouseButton1Up:Connect(function()
+			if self.activeAxis == axis then
+				self:stopDrag()
+			end
+		end)
+		self.handles[axis] = gizmo
 	end
-	self.hoveredAxis = closest
-end
-
-function module:startDrag(axis)
-	local data = self.handles[axis]
-	if not data then return end
-	self.activeAxis = axis
-	self.isDragging = true
-	self.lastMouse = UserInputService:GetMouseLocation()
-	TweenService:Create(data.handle, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
-		Transparency = 0.05
-	}):Play()
 end
 
 function module:setTarget(target)
 	self.selectedTarget = target
-	if target then
-		self:update()
+	for _, gizmo in pairs(self.handles) do
+		gizmo.Adornee = target
+	end
+	if not target then
+		self:show(false)
 	end
 end
 
 function module:show(visible)
-	for _, data in pairs(self.handles) do
-		data.base.Parent = visible and workspace or nil
+	self.visible = visible and self.selectedTarget ~= nil
+	if not self.visible then
+		self:stopDrag()
 	end
-	if visible then
-		self:update()
+	local playerGui = self:getPlayerGui()
+	for _, gizmo in pairs(self.handles) do
+		gizmo.Parent = self.visible and playerGui or nil
 	end
 end
 
 function module:update()
-	if not self.selectedTarget or not self.selectedTarget.Parent then return end
-	for _, data in pairs(self.handles) do
-		data.base.Position = self.selectedTarget.Position + (data.direction * HANDLE_DISTANCE)
+	if not self.selectedTarget or not self.selectedTarget.Parent then
+		self:show(false)
 	end
 end
 
 function module:dragUpdate()
-	if not self.isDragging then return end
-	if not self.activeAxis or not self.selectedTarget or not self.selectedTarget.Parent then
-		self:stopDrag()
-		return
-	end
-	local mouse = UserInputService:GetMouseLocation()
-	local delta = mouse - self.lastMouse
-	self.lastMouse = mouse
-
-	local axisData = self.handles[self.activeAxis]
-	if not axisData then return end
-
-	local moveAmount = (delta.X + delta.Y) * 0.03 * MOUSE_SENSITIVITY
-	self.selectedTarget.CFrame = self.selectedTarget.CFrame + (axisData.direction * moveAmount)
-
-	local childCamera = self.selectedTarget:FindFirstChildOfClass("Camera")
-	if childCamera then
-		childCamera.CFrame = self.selectedTarget.CFrame
-	end
-
-	self:update()
 end
 
 function module:stopDrag()
-	if self.isDragging and self.activeAxis then
-		local axisData = self.handles[self.activeAxis]
-		if axisData then
-			TweenService:Create(axisData.handle, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
-				Transparency = 0.3
-			}):Play()
-		end
-	end
 	self.isDragging = false
 	self.activeAxis = nil
+	self.dragStartCFrame = nil
 end
 
 function module:destroy()
@@ -222,10 +154,8 @@ function module:destroy()
 		end
 	end
 	self.connections = {}
-	for _, data in pairs(self.handles) do
-		if data.base then
-			data.base:Destroy()
-		end
+	for _, gizmo in pairs(self.handles) do
+		gizmo:Destroy()
 	end
 	self.handles = {}
 end
