@@ -1,26 +1,36 @@
-local http = game:GetService("HttpService")
-
 local _cache = {}
-local Dev = {}
-
-function Dev:Import(url)
-	if _cache[url] then
-		return _cache[url]
+local Dev = _G.__RoEditorDev
+if not Dev then
+	Dev = {}
+	function Dev:Import(url)
+		if _cache[url] then
+			return _cache[url]
+		end
+		local lastErr
+		for attempt = 1, 3 do
+			local ok, result = pcall(function()
+				return loadstring(game:HttpGet(url, true))()
+			end)
+			if ok and result then
+				_cache[url] = result
+				return result
+			elseif not ok then
+				lastErr = tostring(result)
+			end
+			task.wait(0.5 * attempt)
+		end
+		if lastErr then
+			warn("[Ro-Editor] import error: " .. lastErr)
+		end
+		return nil
 	end
-	local ok, result = pcall(function()
-		return loadstring(game:HttpGet(url))()
-	end)
-	if ok and result then
-		_cache[url] = result
-		return result
-	end
-	return nil
+	_G.__RoEditorDev = Dev
 end
 
 local function import(url, name)
 	local mod = Dev:Import(url)
 	if not mod then
-		error("[Ro-Editor] Failed to import " .. name .. " (HTTP or loader error)")
+		error("[Ro-Editor] Failed to import " .. name .. " (check Output above for the exact HttpGet error)")
 	end
 	return mod
 end

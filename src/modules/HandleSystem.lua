@@ -1,3 +1,22 @@
+local Dev = _G.__RoEditorDev
+if not Dev then
+	local _cache = {}
+	Dev = {}
+	function Dev:Import(url)
+		if _cache[url] then
+			return _cache[url]
+		end
+		local ok, result = pcall(function()
+			return loadstring(game:HttpGet(url))()
+		end)
+		if ok and result then
+			_cache[url] = result
+			return result
+		end
+		return nil
+	end
+	_G.__RoEditorDev = Dev
+end
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")

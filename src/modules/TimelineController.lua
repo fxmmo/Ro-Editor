@@ -1,5 +1,23 @@
+local Dev = _G.__RoEditorDev
+if not Dev then
+	local _cache = {}
+	Dev = {}
+	function Dev:Import(url)
+		if _cache[url] then
+			return _cache[url]
+		end
+		local ok, result = pcall(function()
+			return loadstring(game:HttpGet(url))()
+		end)
+		if ok and result then
+			_cache[url] = result
+			return result
+		end
+		return nil
+	end
+	_G.__RoEditorDev = Dev
+end
 local Players = game:GetService("Players")
-local Dev = loadstring(game:HttpGet("https://raw.githubusercontent.com/fxmmo/Nightfall-Storage/refs/heads/main/utils/modules/dev.lua"))()
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua") or error("[Ro-Editor] import failed")
