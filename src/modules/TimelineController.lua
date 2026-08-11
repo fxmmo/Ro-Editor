@@ -1,3 +1,4 @@
+local Players = game:GetService("Players")
 local Dev = loadstring(game:HttpGet("https://raw.githubusercontent.com/fxmmo/Nightfall-Storage/refs/heads/main/utils/modules/dev.lua"))()
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -81,9 +82,18 @@ function module:toggleCameraMode()
 	self.cameraMode = not self.cameraMode
 	if self.cameraMode then
 		workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
+		if self.lastCam then
+			local cam = CameraResolver.get(self.lastCam.Name)
+			if cam then
+				workspace.CurrentCamera.CameraSubject = cam
+			end
+		end
 		self.ui.viewButton.BackgroundColor3 = Theme.Accent
 	else
 		workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+		if Players.LocalPlayer.Character then
+			workspace.CurrentCamera.CameraSubject = Players.LocalPlayer.Character
+		end
 		self.ui.viewButton.BackgroundColor3 = Theme.Panel
 	end
 end
