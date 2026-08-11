@@ -83,9 +83,9 @@ function module:toggleCameraMode()
 	if self.cameraMode then
 		workspace.CurrentCamera.CameraType = Enum.CameraType.Scriptable
 		if self.lastCam then
-			local cam = CameraResolver.get(self.lastCam.Name)
-			if cam then
-				workspace.CurrentCamera.CameraSubject = cam
+			local camData = CameraResolver.get(self.lastCam.Name)
+			if camData and camData.camera then
+				workspace.CurrentCamera = camData.camera
 			end
 		end
 		self.ui.viewButton.BackgroundColor3 = Theme.Accent
