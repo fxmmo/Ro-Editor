@@ -31,14 +31,16 @@ local HANDLE_SIZE = Config.HandleSize or 0.5
 local HANDLE_DISTANCE = Config.HandleDistance or 2
 local MOUSE_SENSITIVITY = Config.MouseSensitivity or 1
 
-local HAS_HANDLE_STYLE = pcall(function()
-	return Enum.HandleStyle
-end)
-
 local AXIS_COLORS = {
 	X = (Theme and Theme.AxisX) or Color3.new(1, 0, 0),
 	Y = (Theme and Theme.AxisY) or Color3.new(0, 1, 0),
 	Z = (Theme and Theme.AxisZ) or Color3.new(0, 0.5, 1)
+}
+
+local AXIS_FACES = {
+	X = Enum.NormalId.Right,
+	Y = Enum.NormalId.Top,
+	Z = Enum.NormalId.Front
 }
 
 local AXIS_DIRECTIONS = {
@@ -102,21 +104,19 @@ function module:build()
 	basePart.Parent = workspace
 
 	for axis, color in pairs(AXIS_COLORS) do
-		local visual = Instance.new("Part")
-		visual.Name = "HandleVisual_" .. axis
-		visual.Anchored = true
-		visual.CanCollide = false
-		visual.CanQuery = false
-		visual.CanTouch = false
-		visual.Shape = Enum.PartType.Ball
-		visual.Material = Enum.Material.Neon
-		visual.Color = color
-		visual.Size = Vector3.new(HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE)
-		visual.Transparency = 0.3
-		visual.Parent = basePart
+		local handle = Instance.new("Handle")
+		handle.Name = "Handle_" .. axis
+		handle.Style = Enum.HandleStyle.Movement
+		handle.Massless = true
+		handle.Color = color
+		handle.Transparency = 0.3
+		handle.Size = Vector3.new(HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE)
+		handle.Adornee = basePart
+		handle.Face = AXIS_FACES[axis]
+		handle.Parent = basePart
 
 		self.handles[axis] = {
-			visual = visual,
+			handle = handle,
 			base = basePart,
 			color = color,
 			direction = AXIS_DIRECTIONS[axis]
@@ -152,9 +152,8 @@ function module:startDrag(axis)
 	self.activeAxis = axis
 	self.isDragging = true
 	self.lastMouse = UserInputService:GetMouseLocation()
-	TweenService:Create(data.visual, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
-		Transparency = 0.05,
-		Size = Vector3.new(HANDLE_SIZE * 1.3, HANDLE_SIZE * 1.3, HANDLE_SIZE * 1.3)
+	TweenService:Create(data.handle, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
+		Transparency = 0.05
 	}):Play()
 end
 
@@ -177,7 +176,7 @@ end
 function module:update()
 	if not self.selectedTarget or not self.selectedTarget.Parent then return end
 	for _, data in pairs(self.handles) do
-		data.visual.Position = self.selectedTarget.Position + (data.direction * HANDLE_DISTANCE)
+		data.base.Position = self.selectedTarget.Position + (data.direction * HANDLE_DISTANCE)
 	end
 end
 
@@ -209,9 +208,8 @@ function module:stopDrag()
 	if self.isDragging and self.activeAxis then
 		local axisData = self.handles[self.activeAxis]
 		if axisData then
-			TweenService:Create(axisData.visual, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
-				Transparency = 0.3,
-				Size = Vector3.new(HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE)
+			TweenService:Create(axisData.handle, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
+				Transparency = 0.3
 			}):Play()
 		end
 	end
