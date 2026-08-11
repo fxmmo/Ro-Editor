@@ -18,6 +18,8 @@ if not Dev then
 	_G.__RoEditorDev = Dev
 end
 local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua") or error("[Ro-Editor] import failed")
 local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua") or error("[Ro-Editor] import failed")
 local Theme = ThemeConfig.Theme
@@ -33,6 +35,7 @@ function module.new()
 	self.gui.ResetOnSpawn = false
 	self.gui.IgnoreGuiInset = true
 	self.gui.Parent = player:WaitForChild("PlayerGui")
+	self.modalOpen = false
 	return self
 end
 
@@ -76,37 +79,175 @@ function module:buildTopBar()
 		ZIndex = 11,
 	})
 
-  self.addCamButton = UIFactory.button({
+	-- Single launcher button (was 3 buttons: View / Add / Edit Camera)
+	self.camerasButton = UIFactory.button({
 		Parent = bar,
-		Position = UDim2.new(1, -370, 0.5, -13),
-		Size = UDim2.new(0, 110, 0, 26),
-		Text = "Add Camera",
+		Position = UDim2.new(1, -150, 0.5, -13),
+		Size = UDim2.new(0, 130, 0, 26),
+		Text = "Cameras",
 		Color = Theme.Panel,
 		Corner = 4,
 		ZIndex = 11,
 	})
 
-	self.editButton = UIFactory.button({
-		Parent = bar,
-		Position = UDim2.new(1, -250, 0.5, -13),
-		Size = UDim2.new(0, 110, 0, 26),
-		Text = "Edit Camera",
-		Color = Theme.Panel,
-		Corner = 4,
-		ZIndex = 11,
-	})
-
-	self.viewButton = UIFactory.button({
-		Parent = bar,
-		Position = UDim2.new(1, -130, 0.5, -13),
-		Size = UDim2.new(0, 110, 0, 26),
-		Text = "View Camera",
-		Color = Theme.Panel,
-		Corner = 4,
-		ZIndex = 11,
-	})
+	self:buildCamerasModal()
 
 	return bar
+end
+
+-- Floating window containing View / Add / Edit Camera
+function module:buildCamerasModal()
+	-- Backdrop
+	local backdrop = UIFactory.frame({
+		Parent = self.gui,
+		Size = UDim2.new(1, 0, 1, 0),
+		Position = UDim2.new(0, 0, 0, 0),
+		Color = Color3.new(0, 0, 0),
+		Name = "CamerasModalBackdrop",
+		ZIndex = 50,
+	})
+	backdrop.BackgroundTransparency = 1
+	backdrop.Visible = false
+
+	-- Modal panel
+	local panel = UIFactory.frame({
+		Parent = self.gui,
+		Size = UDim2.new(0, 240, 0, 170),
+		Position = UDim2.new(0.5, -120, 0.5, -85),
+		Color = Theme.Panel,
+		Corner = 6,
+		Name = "CamerasModal",
+		ZIndex = 51,
+	})
+	UIFactory.stroke(panel, Theme.Border, 1)
+	UIFactory.shadow(panel, 0.18)
+
+	-- Header
+	local header = UIFactory.frame({
+		Parent = panel,
+		Size = UDim2.new(1, 0, 0, 32),
+		Position = UDim2.new(0, 0, 0, 0),
+		Color = Theme.Header,
+		Corner = 6,
+		ZIndex = 52,
+	})
+	UIFactory.stroke(header, Theme.Border, 1)
+
+	UIFactory.label({
+		Parent = header,
+		Position = UDim2.new(0, 12, 0, 0),
+		Size = UDim2.new(0, 160, 1, 0),
+		Text = "Cameras",
+		Font = Enum.Font.GothamBold,
+		TextSize = 12,
+		Color = Theme.Text,
+		ZIndex = 53,
+	})
+
+	-- Close button (×)
+	local closeBtn = Instance.new("TextButton")
+	closeBtn.Name = "Close"
+	closeBtn.Size = UDim2.new(0, 22, 0, 22)
+	closeBtn.Position = UDim2.new(1, -28, 0.5, -11)
+	closeBtn.BackgroundColor3 = Theme.Panel
+	closeBtn.BorderSizePixel = 0
+	closeBtn.Font = Enum.Font.GothamBold
+	closeBtn.TextSize = 13
+	closeBtn.TextColor3 = Theme.TextDim
+	closeBtn.Text = "×"
+	closeBtn.AutoButtonColor = false
+	closeBtn.Parent = header
+	closeBtn.ZIndex = 53
+	UIFactory.corner(closeBtn, 3)
+	UIFactory.stroke(closeBtn, Theme.Border, 1)
+
+	-- Helper that styles a row button
+	local function rowBtn(name, text, color, yOffset)
+		local b = Instance.new("TextButton")
+		b.Name = name
+		b.Size = UDim2.new(1, -24, 0, 30)
+		b.Position = UDim2.new(0, 12, 0, yOffset)
+		b.BackgroundColor3 = color or Theme.Header
+		b.BorderSizePixel = 0
+		b.Font = Enum.Font.GothamBold
+		b.TextSize = 12
+		b.TextColor3 = Theme.Text
+		b.Text = text
+		b.AutoButtonColor = false
+		b.Parent = panel
+		b.ZIndex = 52
+		UIFactory.corner(b, 4)
+		UIFactory.stroke(b, Theme.Border, 1)
+		-- hover/press
+		local def = b.BackgroundColor3
+		local hov = def:Lerp(Color3.new(1,1,1), 0.12)
+		local prs = def:Lerp(Color3.new(0,0,0), 0.08)
+		b.MouseEnter:Connect(function()
+			TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = hov}):Play()
+		end)
+		b.MouseLeave:Connect(function()
+			TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = def}):Play()
+		end)
+		b.MouseButton1Down:Connect(function()
+			TweenService:Create(b, TweenInfo.new(0.08), {BackgroundColor3 = prs}):Play()
+		end)
+		b.MouseButton1Up:Connect(function()
+			TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = hov}):Play()
+		end)
+		return b
+	end
+
+	self.camerasPanel = self
+	self.camerasPanel.modalPanel   = panel
+	self.camerasPanel.modalBackdrop = backdrop
+	self.camerasPanel.viewButton   = rowBtn("ViewCamera",  "View Camera",  Theme.Panel,      44)
+	self.camerasPanel.addCamButton = rowBtn("AddCamera",   "Add Camera",   Theme.Accent,     82)
+	self.camerasPanel.editButton   = rowBtn("EditCamera",  "Edit Camera",  Theme.Panel,      120)
+
+	-- Hidden until opened
+	panel.Visible = false
+	self.modalOpen = false
+
+	-- Launcher opens the modal
+	self.camerasButton.MouseButton1Click:Connect(function()
+		self:openCamerasModal()
+	end)
+
+	-- Close interactions
+	closeBtn.MouseButton1Click:Connect(function() self:closeCamerasModal() end)
+	backdrop.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			self:closeCamerasModal()
+		end
+	end)
+end
+
+function module:openCamerasModal()
+	if self.modalOpen then return end
+	self.modalOpen = true
+	self.modalBackdrop.Visible = true
+	self.modalPanel.Visible = true
+	self.modalBackdrop.BackgroundTransparency = 0.55
+	TweenService:Create(self.modalPanel, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Position = UDim2.new(0.5, -120, 0.5, -85)
+	}):Play()
+end
+
+function module:closeCamerasModal()
+	if not self.modalOpen then return end
+	self.modalOpen = false
+	TweenService:Create(self.modalBackdrop, TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
+	TweenService:Create(self.modalPanel, TweenInfo.new(0.15), {
+		Position = UDim2.new(0.5, -110, 0.5, -75)
+	}):Play()
+	task.delay(0.16, function()
+		if not self.modalOpen then
+			self.modalPanel.Visible = false
+			self.modalBackdrop.Visible = false
+			self.modalPanel.Position = UDim2.new(0.5, -120, 0.5, -85)
+		end
+	end)
 end
 
 function module:buildTimelinePanel()
@@ -195,10 +336,10 @@ function module:buildRuler()
 	ruler.BackgroundTransparency = 1
 
 	local maxTime = Config.MaxTime or 10
-	
+
 	for i = 0, maxTime do
 		local xPos = i / maxTime
-		
+
 		local marker = Instance.new("Frame")
 		marker.Size = UDim2.new(0, 1, 0, 12)
 		marker.Position = UDim2.new(xPos, 0, 0, 6)
@@ -281,7 +422,7 @@ function module:renderKeyframes(keyframeTimes)
 
 	for _, time in ipairs(keyframeTimes) do
 		local xPos = time / maxTime
-		
+
 		local guide = Instance.new("Frame")
 		guide.Size = UDim2.new(0, 1, 1, 8)
 		guide.Position = UDim2.new(xPos, 0, 0, -4)
@@ -309,7 +450,7 @@ function module:renderKeyframes(keyframeTimes)
 
 		local defaultSize = diamond.Size
 		local hoverSize = UDim2.new(0, 14, 0, 14)
-		
+
 		diamond.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseMovement then
 				game:GetService("TweenService"):Create(diamond, TweenInfo.new(0.15), {
@@ -352,7 +493,7 @@ function module:buildPlayhead()
 		Corner = 3,
 		ZIndex = 21,
 	})
-	
+
 	UIFactory.frame({
 		Parent = self.playhead,
 		Size = UDim2.new(1, 4, 1, 4),
@@ -380,7 +521,7 @@ function module:buildPlayhead()
 		ZIndex = 21,
 	})
 	bottomHandle.Rotation = 180
-	
+
 	local bottomTriangle = Instance.new("Frame")
 	bottomTriangle.Size = UDim2.new(0, 8, 0, 8)
 	bottomTriangle.Position = UDim2.new(0.5, -4, 0.5, -4)
@@ -426,12 +567,12 @@ function module:setPlayheadPosition(time)
 	local maxTime = Config.MaxTime or 10
 	local clampedTime = math.clamp(time, 0, maxTime)
 	local xPos = clampedTime / maxTime
-	
+
 	local areaWidth = self.area.AbsoluteSize.X - 16
 	local pixelPos = 8 + (xPos * areaWidth)
-	
+
 	self.playheadLine.Position = UDim2.new(0, pixelPos, 0, 4)
-	
+
 	local mins = math.floor(clampedTime / 60)
 	local secs = math.floor(clampedTime % 60)
 	local totalMins = math.floor(maxTime / 60)
