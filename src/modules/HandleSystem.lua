@@ -66,7 +66,7 @@ end
 function module:setupGlobalEvents()
 	self.connections.InputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed then return end
-		if input.UserInputType \~= Enum.UserInputType.MouseButton1 then return end
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
 		if not self.hoveredAxis or not self.selectedTarget then return end
 		self:startDrag(self.hoveredAxis)
 	end)
