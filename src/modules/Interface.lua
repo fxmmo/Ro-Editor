@@ -81,64 +81,190 @@ end
 function module:buildTopBar()
 	local bar = UIFactory.frame({
 		Parent = self.gui,
-		Size = UDim2.new(1, 0, 0, 38),
+		Size = UDim2.new(1, 0, 0, 42),
 		Position = UDim2.new(0, 0, 0, 0),
-		Color = Theme.Header,
-		Name = "TopBar",
+		Color = Theme.StudioToolbar or Theme.Header,
+		Name = "StudioTopBar",
 		ZIndex = 10,
 	})
 	UIFactory.stroke(bar, Theme.Border, 1)
-	UIFactory.shadow(bar, 0.06)
-
-	local accent = UIFactory.frame({
+	UIFactory.shadow(bar, 0.1)
+	local barGradient = Instance.new("UIGradient")
+	barGradient.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Theme.Header),
+		ColorSequenceKeypoint.new(1, Theme.StudioToolbar or Theme.Header),
+	}
+	barGradient.Rotation = 90
+	barGradient.Parent = bar
+	local mark = UIFactory.frame({
 		Parent = bar,
-		Size = UDim2.new(0, 3, 0, 16),
-		Position = UDim2.new(0, 14, 0.5, -8),
-		Color = Theme.Accent or Theme.Playhead,
-		Corner = 2,
+		Size = UDim2.new(0, 26, 0, 26),
+		Position = UDim2.new(0, 10, 0.5, -13),
+		Color = Theme.Accent,
+		Corner = 5,
 		ZIndex = 11,
 	})
-
+	UIFactory.label({
+		Parent = mark,
+		Text = "C",
+		Font = Enum.Font.GothamBlack,
+		TextSize = 15,
+		Color = Color3.new(1, 1, 1),
+		XAlign = Enum.TextXAlignment.Center,
+		ZIndex = 12,
+	})
 	UIFactory.label({
 		Parent = bar,
-		Position = UDim2.new(0, 26, 0, 0),
-		Size = UDim2.new(0, 200, 1, 0),
+		Position = UDim2.new(0, 46, 0, 5),
+		Size = UDim2.new(0, 155, 0, 17),
 		Text = "Camera Animator",
 		Font = Enum.Font.GothamBold,
 		TextSize = 14,
 		Color = Theme.Text,
 		ZIndex = 11,
 	})
-
-	UIFactory.frame({
+	UIFactory.label({
 		Parent = bar,
-		Size = UDim2.new(0, 1, 0, 20),
-		Position = UDim2.new(0, 230, 0.5, -10),
-		Color = Theme.Border,
+		Position = UDim2.new(0, 46, 0, 22),
+		Size = UDim2.new(0, 155, 0, 12),
+		Text = "ANIMATION EDITOR",
+		Font = Enum.Font.GothamMedium,
+		TextSize = 8,
+		Color = Theme.TextMuted,
 		ZIndex = 11,
 	})
-
+	local function menu(text, x, width)
+		local button = Instance.new("TextButton")
+		button.Name = text .. "Menu"
+		button.Size = UDim2.new(0, width, 0, 26)
+		button.Position = UDim2.new(0, x, 0.5, -13)
+		button.BackgroundTransparency = 1
+		button.BorderSizePixel = 0
+		button.Font = Enum.Font.GothamMedium
+		button.TextSize = 10
+		button.TextColor3 = Theme.TextDim
+		button.Text = text
+		button.AutoButtonColor = false
+		button.Parent = bar
+		button.ZIndex = 11
+		button.MouseEnter:Connect(function()
+			button.BackgroundColor3 = Theme.Panel
+			button.BackgroundTransparency = 0
+			button.TextColor3 = Theme.Text
+		end)
+		button.MouseLeave:Connect(function()
+			button.BackgroundTransparency = 1
+			button.TextColor3 = Theme.TextDim
+		end)
+		UIFactory.corner(button, 4)
+		return button
+	end
+	menu("FILE", 214, 42)
+	menu("EDIT", 258, 42)
+	menu("VIEW", 302, 45)
+	local divider = Instance.new("Frame")
+	divider.Size = UDim2.new(0, 1, 0, 22)
+	divider.Position = UDim2.new(0, 361, 0.5, -11)
+	divider.BackgroundColor3 = Theme.StudioSeparator or Theme.Border
+	divider.BorderSizePixel = 0
+	divider.Parent = bar
+	divider.ZIndex = 11
+	UIFactory.label({
+		Parent = bar,
+		Position = UDim2.new(0, 375, 0, 0),
+		Size = UDim2.new(0, 160, 1, 0),
+		Text = "CAMERA SEQUENCER",
+		Font = Enum.Font.GothamBold,
+		TextSize = 10,
+		Color = Theme.TextDim,
+		ZIndex = 11,
+	})
 	self.camerasButton = UIFactory.button({
 		Parent = bar,
-		Position = UDim2.new(1, -150, 0.5, -13),
-		Size = UDim2.new(0, 130, 0, 26),
-		Text = "Cameras",
+		Position = UDim2.new(1, -142, 0.5, -13),
+		Size = UDim2.new(0, 128, 0, 26),
+		Text = "CAMERAS  ▾",
 		Color = Theme.Panel,
 		Corner = 4,
+		TextSize = 10,
 		ZIndex = 11,
 	})
-
+	self:buildStudioRibbon()
 	self:buildCamerasModal()
 	self:buildTimelinePanel()
-
+	self:buildPropertiesPanel()
 	return bar
+end
+
+function module:buildStudioRibbon()
+	local ribbon = UIFactory.frame({
+		Parent = self.gui,
+		Size = UDim2.new(1, 0, 0, 27),
+		Position = UDim2.new(0, 0, 0, 42),
+		Color = Theme.StudioRibbon or Theme.PanelDark,
+		Name = "StudioRibbon",
+		ZIndex = 9,
+	})
+	UIFactory.stroke(ribbon, Theme.Border, 1)
+	local function ribbonLabel(text, x, width, accent)
+		local frame = UIFactory.frame({
+			Parent = ribbon,
+			Size = UDim2.new(0, width, 0, 19),
+			Position = UDim2.new(0, x, 0.5, -9),
+			Color = accent and Theme.Panel or Theme.StudioRibbon or Theme.PanelDark,
+			Corner = 3,
+			ZIndex = 10,
+		})
+		if accent then
+			UIFactory.stroke(frame, Theme.Accent, 1, 0.25)
+		end
+		UIFactory.label({
+			Parent = frame,
+			Text = text,
+			Font = Enum.Font.GothamBold,
+			TextSize = 8,
+			Color = accent and Theme.Text or Theme.TextMuted,
+			XAlign = Enum.TextXAlignment.Center,
+			ZIndex = 11,
+		})
+	end
+	UIFactory.label({
+		Parent = ribbon,
+		Position = UDim2.new(0, 12, 0, 0),
+		Size = UDim2.new(0, 68, 1, 0),
+		Text = "TOOLS",
+		Font = Enum.Font.GothamBold,
+		TextSize = 8,
+		Color = Theme.TextMuted,
+		ZIndex = 10,
+	})
+	ribbonLabel("SELECT", 66, 60, true)
+	ribbonLabel("MOVE", 130, 52, false)
+	ribbonLabel("KEYFRAME", 186, 72, false)
+	local separator = Instance.new("Frame")
+	separator.Size = UDim2.new(0, 1, 0, 15)
+	separator.Position = UDim2.new(0, 270, 0.5, -7)
+	separator.BackgroundColor3 = Theme.StudioSeparator or Theme.Border
+	separator.BorderSizePixel = 0
+	separator.Parent = ribbon
+	separator.ZIndex = 10
+	UIFactory.label({
+		Parent = ribbon,
+		Position = UDim2.new(0, 284, 0, 0),
+		Size = UDim2.new(0, 180, 1, 0),
+		Text = "WORKSPACE  /  CAMERA EDITOR",
+		Font = Enum.Font.GothamMedium,
+		TextSize = 8,
+		Color = Theme.TextMuted,
+		ZIndex = 10,
+	})
 end
 
 function module:buildPropertiesPanel()
 	local panel = UIFactory.frame({
 		Parent = self.gui,
 		Size = UDim2.new(0, 244, 0, 246),
-		Position = UDim2.new(1, -256, 1, -418),
+		Position = UDim2.new(1, -256, 1, -466),
 		Color = Theme.PanelDark,
 		Corner = 7,
 		Name = "KeyframeProperties",
@@ -174,7 +300,7 @@ function module:buildPropertiesPanel()
 		Parent = header,
 		Position = UDim2.new(0, 13, 0, 7),
 		Size = UDim2.new(1, -26, 0, 15),
-		Text = "KEYFRAME PROPERTIES",
+		Text = "PROPERTIES",
 		Font = Enum.Font.GothamBold,
 		TextSize = 11,
 		Color = Theme.Text,
@@ -381,7 +507,7 @@ function module:buildCamerasModal()
 		Parent = header,
 		Position = UDim2.new(0, 12, 0, 0),
 		Size = UDim2.new(0, 160, 1, 0),
-		Text = "Cameras",
+		Text = "EXPLORER  •  CAMERAS",
 		Font = Enum.Font.GothamBold,
 		TextSize = 12,
 		Color = Theme.Text,
@@ -419,7 +545,7 @@ function module:buildCamerasModal()
 		Parent = switchRow,
 		Position = UDim2.new(0, 10, 0, 0),
 		Size = UDim2.new(1, -60, 1, 0),
-		Text = "View Camera",
+		Text = "Camera Preview",
 		Font = Enum.Font.GothamBold,
 		TextSize = 12,
 		Color = Theme.Text,
@@ -492,8 +618,8 @@ function module:buildCamerasModal()
 
 	self.modalPanel    = panel
 	self.modalBackdrop = backdrop
-	self.addCamButton  = rowBtn("AddCamera",  "Add Camera",  Theme.Accent, 90)
-	self.editButton    = rowBtn("EditCamera", "Edit Camera", Theme.Panel,  132)
+	self.addCamButton  = rowBtn("AddCamera",  "+  Add Camera",  Theme.Accent, 90)
+	self.editButton    = rowBtn("EditCamera", "Edit Selected", Theme.Panel,  132)
 
 	panel.Visible = false
 	self.modalOpen = false
@@ -577,93 +703,89 @@ end
 function module:buildTimelinePanel()
 	local panel = UIFactory.frame({
 		Parent = self.gui,
-		Size = UDim2.new(1, 0, 0, 160),
-		Position = UDim2.new(0, 0, 1, -160),
+		Size = UDim2.new(1, 0, 0, 214),
+		Position = UDim2.new(0, 0, 1, -214),
 		Color = Theme.Background,
 		Name = "TimelinePanel",
 		ZIndex = 10,
 	})
 	UIFactory.stroke(panel, Theme.Border, 1)
-	UIFactory.shadow(panel, 0.12)
+	UIFactory.shadow(panel, 0.15)
 	local panelGradient = Instance.new("UIGradient")
 	panelGradient.Color = ColorSequence.new{
-		ColorSequenceKeypoint.new(0, Theme.TimelineSurface or Theme.Background),
-		ColorSequenceKeypoint.new(1, Theme.PanelDark),
+		ColorSequenceKeypoint.new(0, Theme.PanelDark),
+		ColorSequenceKeypoint.new(1, Theme.Background),
 	}
 	panelGradient.Rotation = 90
 	panelGradient.Parent = panel
-
 	local header = UIFactory.frame({
 		Parent = panel,
-		Size = UDim2.new(1, 0, 0, 34),
+		Size = UDim2.new(1, 0, 0, 42),
 		Position = UDim2.new(0, 0, 0, 0),
-		Color = Theme.Header,
+		Color = Theme.StudioToolbar or Theme.Header,
 		Name = "Header",
 		ZIndex = 11,
 	})
 	UIFactory.stroke(header, Theme.Border, 1)
-
+	local headerAccent = Instance.new("Frame")
+	headerAccent.Size = UDim2.new(0, 3, 0, 24)
+	headerAccent.Position = UDim2.new(0, 10, 0.5, -12)
+	headerAccent.BackgroundColor3 = Theme.Accent
+	headerAccent.BorderSizePixel = 0
+	headerAccent.Parent = header
+	headerAccent.ZIndex = 12
+	UIFactory.corner(headerAccent, 2)
 	UIFactory.label({
 		Parent = header,
-		Position = UDim2.new(0, 14, 0, 0),
-		Size = UDim2.new(0, 120, 1, 0),
-		Text = "CAMERA SEQUENCER",
+		Position = UDim2.new(0, 22, 0, 6),
+		Size = UDim2.new(0, 120, 0, 14),
+		Text = "ANIMATION EDITOR",
 		Font = Enum.Font.GothamBold,
-		TextSize = 12,
+		TextSize = 11,
 		Color = Theme.Text,
 		ZIndex = 12,
 	})
 	UIFactory.label({
 		Parent = header,
-		Position = UDim2.new(0, 14, 0, 19),
-		Size = UDim2.new(0, 126, 0, 11),
-		Text = "TIMELINE EDITOR",
+		Position = UDim2.new(0, 22, 0, 21),
+		Size = UDim2.new(0, 120, 0, 11),
+		Text = "CAMERA SEQUENCER",
 		Font = Enum.Font.GothamMedium,
 		TextSize = 8,
 		Color = Theme.TextMuted,
 		ZIndex = 12,
 	})
-
 	self.controls = UIFactory.frame({
 		Parent = header,
-		Position = UDim2.new(0, 150, 0, 4),
-		Size = UDim2.new(0, 280, 1, -8),
-		Color = Theme.Panel,
+		Position = UDim2.new(0, 152, 0.5, -15),
+		Size = UDim2.new(0, 286, 0, 30),
+		Color = Theme.StudioInput or Theme.PanelDark,
 		Corner = 4,
 		Name = "Controls",
 		ZIndex = 12,
 	})
-	UIFactory.stroke(self.controls, Theme.Border, 1, 0.4)
-	local controlsGradient = Instance.new("UIGradient")
-	controlsGradient.Color = ColorSequence.new{
-		ColorSequenceKeypoint.new(0, Theme.Panel:Lerp(Theme.Header, 0.35)),
-		ColorSequenceKeypoint.new(1, Theme.PanelDark),
-	}
-	controlsGradient.Rotation = 90
-	controlsGradient.Parent = self.controls
-
+	UIFactory.stroke(self.controls, Theme.StudioSeparator or Theme.Border, 1, 0.25)
 	self.timeLabel = UIFactory.label({
 		Parent = header,
-		Position = UDim2.new(1, -120, 0, 0),
-		Size = UDim2.new(0, 110, 1, 0),
+		Position = UDim2.new(1, -138, 0, 0),
+		Size = UDim2.new(0, 124, 1, 0),
 		Text = "00:00 / 00:10",
 		Font = Enum.Font.Code,
-		TextSize = 13,
+		TextSize = 12,
 		Color = Theme.TextDim,
 		XAlign = Enum.TextXAlignment.Right,
 		ZIndex = 12,
 	})
-
 	self.area = UIFactory.frame({
 		Parent = panel,
-		Size = UDim2.new(1, -20, 1, -44),
-		Position = UDim2.new(0, 10, 0, 38),
+		Size = UDim2.new(1, -16, 1, -54),
+		Position = UDim2.new(0, 8, 0, 48),
 		Color = Theme.TimelineSurface or Theme.PanelDark,
-		Corner = 6,
+		Corner = 4,
 		Name = "TimelineArea",
 		ZIndex = 11,
 	})
-	UIFactory.stroke(self.area, Theme.Border, 1, 0.6)
+	UIFactory.stroke(self.area, Theme.StudioSeparator or Theme.Border, 1, 0.35)
 	local areaGradient = Instance.new("UIGradient")
 	areaGradient.Color = ColorSequence.new{
 		ColorSequenceKeypoint.new(0, Theme.TimelineSurface or Theme.PanelDark),
@@ -671,11 +793,37 @@ function module:buildTimelinePanel()
 	}
 	areaGradient.Rotation = 90
 	areaGradient.Parent = self.area
-
+	local leftHeader = UIFactory.label({
+		Parent = self.area,
+		Position = UDim2.new(0, 12, 0, 3),
+		Size = UDim2.new(0, 72, 0, 18),
+		Text = "TRACKS",
+		Font = Enum.Font.GothamBold,
+		TextSize = 8,
+		Color = Theme.TextMuted,
+		ZIndex = 29,
+	})
+	local timelineHeader = UIFactory.label({
+		Parent = self.area,
+		Position = UDim2.new(0, TIMELINE_AXIS_LEFT, 0, 3),
+		Size = UDim2.new(0, 90, 0, 18),
+		Text = "TIMELINE",
+		Font = Enum.Font.GothamBold,
+		TextSize = 8,
+		Color = Theme.TextMuted,
+		ZIndex = 29,
+	})
+	local rulerLine = Instance.new("Frame")
+	rulerLine.Size = UDim2.new(1, -16, 0, 1)
+	rulerLine.Position = UDim2.new(0, 8, 0, 25)
+	rulerLine.BackgroundColor3 = Theme.StudioSeparator or Theme.Border
+	rulerLine.BorderSizePixel = 0
+	rulerLine.Parent = self.area
+	rulerLine.ZIndex = 28
 	self.tracksList = Instance.new("ScrollingFrame")
 	self.tracksList.Name = "TracksList"
-	self.tracksList.Size = UDim2.new(1, -16, 1, -28)
-	self.tracksList.Position = UDim2.new(0, 8, 0, 26)
+	self.tracksList.Size = UDim2.new(1, -12, 1, -33)
+	self.tracksList.Position = UDim2.new(0, 6, 0, 29)
 	self.tracksList.BackgroundTransparency = 1
 	self.tracksList.BorderSizePixel = 0
 	self.tracksList.ScrollBarThickness = 4
@@ -684,17 +832,14 @@ function module:buildTimelinePanel()
 	self.tracksList.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	self.tracksList.Parent = self.area
 	self.tracksList.ZIndex = 12
-
 	local layout = Instance.new("UIListLayout")
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Padding = UDim.new(0, 4)
 	layout.Parent = self.tracksList
 	layout.FillDirection = Enum.FillDirection.Vertical
-
 	self:buildRuler()
 	self:buildPlayhead()
 end
-
 function module:addTrackGrid(container)
 	local maxTime = getMaxTime()
 	for i = 0, maxTime do
@@ -1085,11 +1230,11 @@ end
 function module:createControlButton(index, text, color, callback)
 	local btn = UIFactory.button({
 		Parent = self.controls,
-		Position = UDim2.new(0, 6 + (index - 1) * 46, 0.5, -12),
+		Position = UDim2.new(0, 5 + (index - 1) * 46, 0.5, -12),
 		Size = UDim2.new(0, 40, 0, 24),
 		Text = text,
 		Color = color or Theme.Panel,
-		Corner = 4,
+		Corner = 3,
 		TextSize = 12,
 		ZIndex = 13,
 	})
