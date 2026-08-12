@@ -301,30 +301,43 @@ function module:_refreshTimelineHeight()
 end
 
 function module:setupButtons()
-	self.playBtn   = self.ui:createControlButton(1, "▶", Theme.Panel,   function() self:play()  end)
-	self.pauseBtn  = self.ui:createControlButton(2, "⏸", Theme.Panel,   function() self:pause() end)
-	self.stopBtn   = self.ui:createControlButton(3, "⏹", Theme.Panel,   function() self:stop()  end)
-	self.addBtn    = self.ui:createControlButton(4, "＋", Theme.Panel,  function() self:addKeyframe() end)
-	self.deleteBtn = self.ui:createControlButton(5, "✕", Theme.Panel,   function() self:deleteKeyframe() end)
+	self.playBtn = self.ui:createControlButton(1, "▶", Theme.Panel, function()
+		self:togglePlayback()
+	end)
+	self.stopBtn = self.ui:createControlButton(2, "⏹", Theme.Panel, function()
+		self:stop()
+	end)
+	self.addBtn = self.ui:createControlButton(3, "＋", Theme.Panel, function()
+		self:addKeyframe()
+	end)
+	self.deleteBtn = self.ui:createControlButton(4, "✕", Theme.Panel, function()
+		self:deleteKeyframe()
+	end)
 end
-
+function module:_updatePlaybackButton()
+	if not self.playBtn then return end
+	self.playBtn.Text = self.isPlaying and "⏸" or "▶"
+	self.playBtn.BackgroundColor3 = self.isPlaying and Theme.Success or Theme.Panel
+end
+function module:togglePlayback()
+	if self.isPlaying then
+		self:pause()
+	else
+		self:play()
+	end
+end
 function module:play()
 	self.isPlaying = true
-	self.playBtn.BackgroundColor3 = Theme.Success
-	self.pauseBtn.BackgroundColor3 = Theme.Panel
+	self:_updatePlaybackButton()
 end
-
 function module:pause()
 	self.isPlaying = false
-	self.pauseBtn.BackgroundColor3 = Theme.Warning
-	self.playBtn.BackgroundColor3 = Theme.Panel
+	self:_updatePlaybackButton()
 end
-
 function module:stop()
 	self.isPlaying = false
 	self.currentTime = 0
-	self.playBtn.BackgroundColor3 = Theme.Panel
-	self.pauseBtn.BackgroundColor3 = Theme.Panel
+	self:_updatePlaybackButton()
 end
 
 function module:addKeyframe()
@@ -414,6 +427,7 @@ function module:selectKeyframe(camName, data)
 	self.ui:setKeyframeProperties(selected)
 	self.currentTime = selected.time or 0
 	self.isPlaying = false
+	self:_updatePlaybackButton()
 	self:updatePlayhead()
 	self:tweenCameraTo(selected.cframe)
 end
@@ -528,8 +542,7 @@ function module:startLoop()
 			self.currentTime = self.currentTime + dt
 			if self.currentTime >= Config.MaxTime then
 				self.currentTime = Config.MaxTime
-				self.isPlaying = false
-				self.playBtn.BackgroundColor3 = Theme.Panel
+				self:pause()
 			end
 			self:updateCameraByTime()
 		end
@@ -537,7 +550,7 @@ function module:startLoop()
 		if self.isDraggingPlayhead then
 			local mousePos = UserInputService:GetMouseLocation()
 			self.currentTime = self.ui:xToTime(mousePos.X)
-			self.isPlaying = false
+			self:pause()
 			self:updateCameraByTime()
 		end
 
