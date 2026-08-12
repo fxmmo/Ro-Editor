@@ -160,9 +160,7 @@ function module:buildTopBar()
 	})
 	UIFactory.setIcon(self.camerasButton, Icons.Camera, {
 		Color = Theme.Text,
-		TextOffset = 28,
-		Size = UDim2.new(0, 16, 0, 16),
-		Position = UDim2.new(0, 8, 0.5, -8),
+		TextOffset = 20,
 	})
 
 	self:buildCamerasModal()
@@ -329,9 +327,9 @@ function module:buildCamerasModal()
 	self.addCamButton = rowBtn("AddCamera", "Add Camera", Theme.Accent, 86, 140, 12)
 	self.editButton = rowBtn("EditCamera", "Edit Camera", Theme.Panel, 86, 140, 164)
 	self.deleteCamButton = rowBtn("DeleteCamera", "Delete Camera", Theme.Danger, 122, 296, 12)
-	UIFactory.setIcon(self.addCamButton, Icons.Plus, {Color = Theme.Text, TextOffset = 28})
-	UIFactory.setIcon(self.editButton, Icons.Pencil, {Color = Theme.Text, TextOffset = 28})
-	UIFactory.setIcon(self.deleteCamButton, Icons.Trash, {Color = Theme.Text, TextOffset = 28})
+	UIFactory.setIcon(self.addCamButton, Icons.Plus, {Color = Theme.Text, TextOffset = 20})
+	UIFactory.setIcon(self.editButton, Icons.Pencil, {Color = Theme.Text, TextOffset = 20})
+	UIFactory.setIcon(self.deleteCamButton, Icons.Trash, {Color = Theme.Text, TextOffset = 20})
 	local editSection = Instance.new("Frame")
 	editSection.Name = "EditCameraSection"
 	editSection.Size = UDim2.new(1, -24, 0, 82)
@@ -367,7 +365,7 @@ function module:buildCamerasModal()
 			button.Name = name
 			UIFactory.setIcon(button, mode == "move" and Icons.Move3D or Icons.Rotate3D, {
 				Color = Theme.TextDim,
-				TextOffset = 28,
+				TextOffset = 20,
 			})
 			button.MouseButton1Click:Connect(function()
 			self:setEditTool(mode)
@@ -476,7 +474,7 @@ function module:buildCamerasModal()
 		TextSize = 10,
 		ZIndex = 53,
 		})
-		UIFactory.setIcon(apply, Icons.Check, {Color = Theme.Text, TextOffset = 28})
+		UIFactory.setIcon(apply, Icons.Check, {Color = Theme.Text, TextOffset = 20})
 		apply.MouseButton1Click:Connect(function()
 		if self.onPropertiesSubmitted then
 			self.onPropertiesSubmitted(self:getPropertyValues())
@@ -492,7 +490,7 @@ function module:buildCamerasModal()
 		TextSize = 10,
 		ZIndex = 53,
 		})
-		UIFactory.setIcon(reset, Icons.RotateCCW, {Color = Theme.Text, TextOffset = 28})
+		UIFactory.setIcon(reset, Icons.RotateCCW, {Color = Theme.Text, TextOffset = 20})
 		reset.MouseButton1Click:Connect(function()
 		if self.propertyKeyframe then
 			self:setKeyframeProperties(self.propertyKeyframe)

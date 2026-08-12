@@ -171,21 +171,33 @@ function module.setIcon(button, assetId, options)
 	icon.ImageColor3 = options.Color or Theme.Text
 	icon.ImageTransparency = options.Transparency or 0
 	icon.Size = options.Size or UDim2.new(0, 16, 0, 16)
-	icon.Position = options.Position or UDim2.new(0, 8, 0.5, -8)
 	icon.AnchorPoint = options.AnchorPoint or Vector2.new(0, 0)
 	icon.ZIndex = options.ZIndex or button.ZIndex + 1
+	icon.ScaleType = options.ScaleType or Enum.ScaleType.Fit
+	icon.ResampleMode = options.ResampleMode or Enum.ResamplerMode.Default
+	button.TextWrapped = false
 	if options.IconOnly then
 		button.Text = ""
 		button.TextXAlignment = Enum.TextXAlignment.Center
-	elseif options.TextOffset then
-		button.TextXAlignment = Enum.TextXAlignment.Left
+		icon.Position = options.Position or UDim2.new(0.5, 0, 0.5, 0)
+		if options.Position == nil then
+			icon.AnchorPoint = Vector2.new(0.5, 0.5)
+		end
+	else
+		button.TextXAlignment = Enum.TextXAlignment.Center
+		local iconOffset = options.TextOffset or 20
+		local iconWidth = (options.Size and options.Size.X.Offset or 16)
+		icon.Position = UDim2.new(0, iconOffset, 0.5, -8)
 		local padding = button:FindFirstChild("IconPadding")
 		if not padding then
 			padding = Instance.new("UIPadding")
 			padding.Name = "IconPadding"
 			padding.Parent = button
 		end
-		padding.PaddingLeft = UDim.new(0, options.TextOffset)
+		padding.PaddingLeft = UDim.new(0, iconOffset + iconWidth + 4)
+		padding.PaddingTop = UDim.new(0, 0)
+		padding.PaddingBottom = UDim.new(0, 0)
+		padding.PaddingRight = UDim.new(0, 0)
 	end
 	return icon
 end
