@@ -72,6 +72,7 @@ function module.new()
 	self.visible = false
 	self.mode = "move"
 	self.onChanged = nil
+	self.onDragStateChanged = nil
 	self:build()
 	self:show(false)
 	return self
@@ -95,7 +96,7 @@ function module:build()
 			if not self.visible or self.mode ~= "move" or not self.selectedTarget or not self.selectedTarget.Parent then return end
 			self.dragFace = face
 			self.dragStartCFrame = self.selectedTarget.CFrame
-			self.isDragging = true
+			self:_setDragging(true)
 		end)
 		self.connections[#self.connections + 1] = handle.MouseDrag:Connect(function(face, distance)
 			if not self.isDragging or self.mode ~= "move" or face ~= self.dragFace then return end
@@ -130,7 +131,7 @@ function module:build()
 		if not self.visible or self.mode ~= "rotate" or not self.selectedTarget or not self.selectedTarget.Parent then return end
 		self.dragAxis = axis
 		self.dragStartCFrame = self.selectedTarget.CFrame
-		self.isDragging = true
+		self:_setDragging(true)
 	end)
 	self.connections[#self.connections + 1] = arcHandles.MouseDrag:Connect(function(axis, relativeAngle)
 		if not self.isDragging or self.mode ~= "rotate" or axis ~= self.dragAxis then return end
@@ -206,11 +207,20 @@ end
 function module:dragUpdate()
 end
 
+function module:_setDragging(dragging)
+	dragging = dragging and true or false
+	if self.isDragging == dragging then return end
+	self.isDragging = dragging
+	if self.onDragStateChanged then
+		self.onDragStateChanged(dragging)
+	end
+end
+
 function module:stopDrag()
-	self.isDragging = false
 	self.dragFace = nil
 	self.dragAxis = nil
 	self.dragStartCFrame = nil
+	self:_setDragging(false)
 end
 
 function module:destroy()
