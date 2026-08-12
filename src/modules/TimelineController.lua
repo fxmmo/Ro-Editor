@@ -42,6 +42,7 @@ function module.new(interface, store, handles)
 	self.cameraMode = false
 	self.lastCam = nil
 	self.playerCamera = workspace.CurrentCamera
+	self.tweenConnection = nil
 	self.storeByCamera = {}
 	self.connections = {}
 	self.ui.onTrackSelected = function(cameraName)
@@ -127,9 +128,8 @@ function module:selectCamera(cameraName)
 		self.handles:setTarget(entry.part)
 		self.handles:show(true)
 	end
-	if self.cameraMode and entry.camera then
-		entry.camera.CameraType = Enum.CameraType.Scriptable
-		workspace.CurrentCamera = entry.camera
+	if self.cameraMode then
+		self:_applyCameraMode()
 	end
 end
 
@@ -154,20 +154,24 @@ end
 function module:_applyCameraMode()
 	if self.cameraMode then
 		local entry = self:activeCam()
-		if not entry or not entry.camera then return end
+		if not entry or not entry.camera then
+			self.cameraMode = false
+			self.ui:setViewToggle(false)
+			return self:_applyCameraMode()
+		end
 		if workspace.CurrentCamera ~= entry.camera then
 			self.playerCamera = workspace.CurrentCamera
 		end
 		entry.camera.CameraType = Enum.CameraType.Scriptable
 		workspace.CurrentCamera = entry.camera
-	else
-		if not self.playerCamera or not self.playerCamera.Parent then return end
-		workspace.CurrentCamera = self.playerCamera
-		self.playerCamera.CameraType = Enum.CameraType.Custom
-		local character = Players.LocalPlayer.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		self.playerCamera.CameraSubject = humanoid or character
+		return
 	end
+	if not self.playerCamera or not self.playerCamera.Parent then return end
+	workspace.CurrentCamera = self.playerCamera
+	self.playerCamera.CameraType = Enum.CameraType.Custom
+	local character = Players.LocalPlayer.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	self.playerCamera.CameraSubject = humanoid or character
 end
 
 function module:_refreshTimelineHeight()
@@ -268,7 +272,10 @@ end
 function module:tweenCameraTo(targetCFrame)
 	local entry = self:activeCam()
 	if not entry or not targetCFrame then return end
-
+	if self.tweenConnection then
+		self.tweenConnection:Disconnect()
+		self.tweenConnection = nil
+	end
 	local startCFrame = CameraResolver.getCFrame(entry)
 	if not startCFrame then return end
 	local startTime = os.clock()
@@ -280,8 +287,12 @@ function module:tweenCameraTo(targetCFrame)
 		CameraResolver.setCFrame(entry, startCFrame:Lerp(targetCFrame, alpha))
 		if alpha >= 1 then
 			connection:Disconnect()
+			if self.tweenConnection == connection then
+				self.tweenConnection = nil
+			end
 		end
 	end)
+	self.tweenConnection = connection
 end
 
 function module:deleteKeyframe()
@@ -394,6 +405,10 @@ function module:startLoop()
 end
 
 function module:destroy()
+	if self.tweenConnection then
+		self.tweenConnection:Disconnect()
+		self.tweenConnection = nil
+	end
 	for _, connection in pairs(self.connections) do
 		if connection then connection:Disconnect() end
 	end
