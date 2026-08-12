@@ -65,6 +65,8 @@ function module.new()
 	self.modalOpen = false
 	self.tracks = {}
 	self.activeCameraName = nil
+	self.propertyFields = {}
+	self.propertyKeyframe = nil
 	return self
 end
 
@@ -130,6 +132,203 @@ function module:buildTopBar()
 	self:buildTimelinePanel()
 
 	return bar
+end
+
+function module:buildPropertiesPanel()
+	local panel = UIFactory.frame({
+		Parent = self.gui,
+		Size = UDim2.new(0, 244, 0, 246),
+		Position = UDim2.new(1, -256, 1, -418),
+		Color = Theme.PanelDark,
+		Corner = 7,
+		Name = "KeyframeProperties",
+		ZIndex = 20,
+	})
+	UIFactory.stroke(panel, Theme.Border, 1, 0.15)
+	UIFactory.shadow(panel, 0.16)
+	local gradient = Instance.new("UIGradient")
+	gradient.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Theme.Panel),
+		ColorSequenceKeypoint.new(1, Theme.TimelineSurface or Theme.PanelDark),
+	}
+	gradient.Rotation = 90
+	gradient.Parent = panel
+	panel.Visible = false
+	self.propertiesPanel = panel
+
+	local header = UIFactory.frame({
+		Parent = panel,
+		Size = UDim2.new(1, 0, 0, 42),
+		Position = UDim2.new(0, 0, 0, 0),
+		Color = Theme.Header,
+		Corner = 7,
+		ZIndex = 21,
+	})
+	local headerLine = Instance.new("Frame")
+	headerLine.Size = UDim2.new(1, 0, 0, 2)
+	headerLine.BackgroundColor3 = Theme.Accent
+	headerLine.BorderSizePixel = 0
+	headerLine.Parent = header
+	headerLine.ZIndex = 22
+	UIFactory.label({
+		Parent = header,
+		Position = UDim2.new(0, 13, 0, 7),
+		Size = UDim2.new(1, -26, 0, 15),
+		Text = "KEYFRAME PROPERTIES",
+		Font = Enum.Font.GothamBold,
+		TextSize = 11,
+		Color = Theme.Text,
+		ZIndex = 22,
+	})
+	self.propertiesInfo = UIFactory.label({
+		Parent = header,
+		Position = UDim2.new(0, 13, 0, 22),
+		Size = UDim2.new(1, -26, 0, 12),
+		Text = "SELECT A KEYFRAME",
+		Font = Enum.Font.GothamMedium,
+		TextSize = 8,
+		Color = Theme.TextMuted,
+		ZIndex = 22,
+	})
+
+	local function addSection(title, top)
+		UIFactory.label({
+			Parent = panel,
+			Position = UDim2.new(0, 13, 0, top),
+			Size = UDim2.new(1, -26, 0, 13),
+			Text = title,
+			Font = Enum.Font.GothamBold,
+			TextSize = 9,
+			Color = Theme.TextDim,
+			ZIndex = 22,
+		})
+	end
+
+	local function addField(key, labelText, top, accent)
+		UIFactory.label({
+			Parent = panel,
+			Position = UDim2.new(0, 14, 0, top),
+			Size = UDim2.new(0, 17, 0, 22),
+			Text = labelText,
+			Font = Enum.Font.GothamBold,
+			TextSize = 10,
+			Color = accent,
+			ZIndex = 22,
+		})
+		local box = Instance.new("TextBox")
+		box.Name = key
+		box.Size = UDim2.new(0, 88, 0, 22)
+		box.Position = UDim2.new(0, 32, 0, top)
+		box.BackgroundColor3 = Theme.Background
+		box.BorderSizePixel = 0
+		box.ClearTextOnFocus = false
+		box.PlaceholderText = "0.000"
+		box.PlaceholderColor3 = Theme.TextMuted
+		box.Text = ""
+		box.Font = Enum.Font.Code
+		box.TextSize = 10
+		box.TextColor3 = Theme.Text
+		box.TextXAlignment = Enum.TextXAlignment.Right
+		box.Parent = panel
+		box.ZIndex = 22
+		UIFactory.corner(box, 4)
+		UIFactory.stroke(box, Theme.Border, 1, 0.25)
+		self.propertyFields[key] = box
+		box.FocusLost:Connect(function()
+			if self.onPropertiesSubmitted then
+				self.onPropertiesSubmitted(self:getPropertyValues())
+			end
+		end)
+	end
+
+	addSection("POSITION", 50)
+	addField("positionX", "X", 65, Theme.AxisX)
+	addField("positionY", "Y", 91, Theme.AxisY)
+	addField("positionZ", "Z", 117, Theme.AxisZ)
+	addSection("ROTATION", 146)
+	addField("rotationX", "X", 161, Theme.AxisX)
+	addField("rotationY", "Y", 187, Theme.AxisY)
+	addField("rotationZ", "Z", 213, Theme.AxisZ)
+
+	local apply = UIFactory.button({
+		Parent = panel,
+		Position = UDim2.new(0, 132, 0, 187),
+		Size = UDim2.new(0, 99, 0, 22),
+		Text = "APPLY",
+		Color = Theme.Accent,
+		Corner = 4,
+		TextSize = 9,
+		ZIndex = 22,
+	})
+	apply.MouseButton1Click:Connect(function()
+		if self.onPropertiesSubmitted then
+			self.onPropertiesSubmitted(self:getPropertyValues())
+		end
+	end)
+	local reset = UIFactory.button({
+		Parent = panel,
+		Position = UDim2.new(0, 132, 0, 213),
+		Size = UDim2.new(0, 99, 0, 22),
+		Text = "RESET",
+		Color = Theme.Panel,
+		Corner = 4,
+		TextSize = 9,
+		ZIndex = 22,
+	})
+	reset.MouseButton1Click:Connect(function()
+		if self.propertyKeyframe then
+			self:setKeyframeProperties(self.propertyKeyframe)
+		end
+	end)
+end
+
+function module:getPropertyValues()
+	if not self.propertyKeyframe then return nil end
+	local values = {}
+	for key, box in pairs(self.propertyFields) do
+		local value = tonumber(box.Text)
+		if not value then return nil end
+		values[key] = value
+	end
+	return values
+end
+
+function module:setKeyframeProperties(data)
+	if not data then
+		self:clearKeyframeProperties()
+		return
+	end
+	local position = data.position or (data.cframe and data.cframe.Position)
+	local orientation = data.orientation
+	if not orientation and data.cframe then
+		local rx, ry, rz = data.cframe:ToOrientation()
+		orientation = Vector3.new(math.deg(rx), math.deg(ry), math.deg(rz))
+	end
+	if not position or not orientation then return end
+	self.propertyKeyframe = data
+	self.propertiesPanel.Visible = true
+	self.propertiesInfo.Text = string.format("%s  •  %.2fs", string.upper(data.cameraName or "CAMERA"), data.time or 0)
+	local values = {
+		positionX = position.X,
+		positionY = position.Y,
+		positionZ = position.Z,
+		rotationX = orientation.X,
+		rotationY = orientation.Y,
+		rotationZ = orientation.Z,
+	}
+	for key, value in pairs(values) do
+		local box = self.propertyFields[key]
+		if box and not box:IsFocused() then
+			box.Text = string.format("%.3f", value)
+		end
+	end
+end
+
+function module:clearKeyframeProperties()
+	self.propertyKeyframe = nil
+	if self.propertiesPanel then
+		self.propertiesPanel.Visible = false
+	end
 end
 
 function module:buildCamerasModal()
