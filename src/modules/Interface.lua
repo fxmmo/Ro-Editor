@@ -177,7 +177,7 @@ function module:buildCamerasModal()
 	backdrop.Visible = false
 	local panel = UIFactory.frame({
 		Parent = self.gui,
-		Size = UDim2.new(0, 320, 0, 400),
+		Size = UDim2.new(0, 320, 0, 428),
 		Color = Theme.Panel,
 		Corner = 6,
 		Name = "CamerasModal",
@@ -274,45 +274,46 @@ function module:buildCamerasModal()
 		callback = nil,
 		button = switchRow,
 	}
-	local function rowBtn(name, text, color, yOffset)
+	local function rowBtn(name, text, color, yOffset, width, xOffset)
 		local b = Instance.new("TextButton")
-		b.Name = name
-		b.Size = UDim2.new(0, 140, 0, 30)
-		b.Position = UDim2.new(0, 12 + (name == "EditCamera" and 152 or 0), 0, yOffset)
-		b.BackgroundColor3 = color or Theme.Header
-		b.BorderSizePixel = 0
-		b.Font = Enum.Font.GothamBold
-		b.TextSize = 11
-		b.TextColor3 = Theme.Text
-		b.Text = text
-		b.AutoButtonColor = false
-		b.Parent = panel
-		b.ZIndex = 52
-		UIFactory.corner(b, 4)
-		UIFactory.stroke(b, Theme.Border, 1)
-		local def = b.BackgroundColor3
-		local hov = def:Lerp(Color3.new(1, 1, 1), 0.12)
-		local prs = def:Lerp(Color3.new(0, 0, 0), 0.08)
-		b.MouseEnter:Connect(function()
-			TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = hov}):Play()
-		end)
-		b.MouseLeave:Connect(function()
-			TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = def}):Play()
-		end)
-		b.MouseButton1Down:Connect(function()
-			TweenService:Create(b, TweenInfo.new(0.08), {BackgroundColor3 = prs}):Play()
-		end)
-		b.MouseButton1Up:Connect(function()
-			TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = hov}):Play()
-		end)
-		return b
-	end
-	self.addCamButton = rowBtn("AddCamera", "Add Camera", Theme.Accent, 86)
-	self.editButton = rowBtn("EditCamera", "Edit Camera", Theme.Panel, 86)
+			b.Name = name
+			b.Size = UDim2.new(0, width or 140, 0, 30)
+			b.Position = UDim2.new(0, xOffset or 12, 0, yOffset)
+			b.BackgroundColor3 = color or Theme.Header
+			b.BorderSizePixel = 0
+			b.Font = Enum.Font.GothamBold
+			b.TextSize = 11
+			b.TextColor3 = Theme.Text
+			b.Text = text
+			b.AutoButtonColor = false
+			b.Parent = panel
+			b.ZIndex = 52
+			UIFactory.corner(b, 4)
+			UIFactory.stroke(b, Theme.Border, 1)
+			local def = b.BackgroundColor3
+			local hov = def:Lerp(Color3.new(1, 1, 1), 0.12)
+			local prs = def:Lerp(Color3.new(0, 0, 0), 0.08)
+			b.MouseEnter:Connect(function()
+				TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = hov}):Play()
+			end)
+			b.MouseLeave:Connect(function()
+				TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = def}):Play()
+			end)
+			b.MouseButton1Down:Connect(function()
+				TweenService:Create(b, TweenInfo.new(0.08), {BackgroundColor3 = prs}):Play()
+			end)
+			b.MouseButton1Up:Connect(function()
+				TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = hov}):Play()
+			end)
+			return b
+		end
+	self.addCamButton = rowBtn("AddCamera", "Add Camera", Theme.Accent, 86, 140, 12)
+	self.editButton = rowBtn("EditCamera", "Edit Camera", Theme.Panel, 86, 140, 164)
+	self.deleteCamButton = rowBtn("DeleteCamera", "Delete Camera", Theme.Danger, 122, 296, 12)
 	local editSection = Instance.new("Frame")
 	editSection.Name = "EditCameraSection"
 	editSection.Size = UDim2.new(1, -24, 0, 82)
-	editSection.Position = UDim2.new(0, 12, 0, 138)
+	editSection.Position = UDim2.new(0, 12, 0, 166)
 	editSection.BackgroundColor3 = Theme.Header
 	editSection.BorderSizePixel = 0
 	editSection.Parent = panel
@@ -357,7 +358,7 @@ function module:buildCamerasModal()
 	editSection.Visible = false
 	local separator = Instance.new("Frame")
 	separator.Size = UDim2.new(1, -24, 0, 1)
-	separator.Position = UDim2.new(0, 12, 0, 130)
+	separator.Position = UDim2.new(0, 12, 0, 158)
 	separator.BackgroundColor3 = Theme.Border
 	separator.BorderSizePixel = 0
 	separator.Parent = panel
@@ -365,7 +366,7 @@ function module:buildCamerasModal()
 	self.propertiesInfo = UIFactory.label({
 		Parent = panel,
 		Name = "KeyframePropertiesInfo",
-		Position = UDim2.new(0, 12, 0, 141),
+		Position = UDim2.new(0, 12, 0, 169),
 		Size = UDim2.new(1, -24, 0, 16),
 		Text = "SELECT A KEYFRAME TO EDIT PROPERTIES",
 		Font = Enum.Font.GothamBold,
@@ -376,7 +377,7 @@ function module:buildCamerasModal()
 	local properties = Instance.new("Frame")
 	properties.Name = "KeyframeProperties"
 	properties.Size = UDim2.new(1, -24, 0, 220)
-	properties.Position = UDim2.new(0, 12, 0, 165)
+	properties.Position = UDim2.new(0, 12, 0, 193)
 	properties.BackgroundTransparency = 1
 	properties.BorderSizePixel = 0
 	properties.Parent = panel
@@ -555,9 +556,9 @@ function module:setEditSectionVisible(visible)
 	self.editSectionOpen = visible and true or false
 	self.editSection.Visible = self.editSectionOpen
 	local offset = self.editSectionOpen and 89 or 0
-	self.propertiesInfo.Position = UDim2.new(0, 12, 0, 141 + offset)
-	self.propertiesSection.Position = UDim2.new(0, 12, 0, 165 + offset)
-	self.modalPanel.Size = UDim2.new(0, 320, 0, 400 + offset)
+	self.propertiesInfo.Position = UDim2.new(0, 12, 0, 169 + offset)
+	self.propertiesSection.Position = UDim2.new(0, 12, 0, 193 + offset)
+	self.modalPanel.Size = UDim2.new(0, 320, 0, 428 + offset)
 	if self.modalOpen then
 		self:repositionModal()
 	end
@@ -618,7 +619,7 @@ function module:repositionModal()
 	local btnSize = btn.AbsoluteSize
 	local panel = self.modalPanel
 
-	local panelHeight = self.editSectionOpen and 489 or 400
+	local panelHeight = self.editSectionOpen and 517 or 428
 	panel.Size = UDim2.new(0, 320, 0, panelHeight)
 
 	local desiredX = btnAbs.X + btnSize.X - 320
@@ -945,6 +946,19 @@ function module:setActiveCamera(cameraName)
 			and Theme.Accent:Lerp(Theme.Panel, 0.25)
 			or Theme.Panel
 	end
+end
+
+function module:removeTrack(cameraName)
+	local track = self.tracks[cameraName]
+	if not track then return end
+	if track.row and track.row.Parent then
+		track.row:Destroy()
+	end
+	self.tracks[cameraName] = nil
+	if self.activeCameraName == cameraName then
+		self.activeCameraName = nil
+	end
+	self:refreshTimelineAxis()
 end
 
 function module:renderKeyframes(keyframeTimes)

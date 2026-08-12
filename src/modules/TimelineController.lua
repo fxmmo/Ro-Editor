@@ -121,7 +121,11 @@ function module:setupModeButtons()
 		self:addCamera()
 		self.ui:closeCamerasModal()
 	end)
-
+	self.ui.deleteCamButton.MouseButton1Click:Connect(function()
+		if self:deleteCamera() then
+			self.ui:closeCamerasModal()
+		end
+	end)
 	self.ui:setViewToggle(false, function(on)
 		self.cameraMode = on and true or false
 		self:_applyCameraMode()
@@ -173,6 +177,35 @@ function module:selectCamera(cameraName, preserveProperties)
 	if self.cameraMode then
 		self:_applyCameraMode()
 	end
+end
+
+function module:deleteCamera()
+	local cameraName = self.lastCam and self.lastCam.name
+	if not cameraName or not CameraResolver.get(cameraName) then
+		return false
+	end
+	self:_setPlayerCameraLocked(false)
+	self.editMode = false
+	self.editTool = "move"
+	self.handles:show(false)
+	if self.cameraMode then
+		self.cameraMode = false
+		self.ui:setViewToggle(false)
+		self:_restorePlayerCamera()
+	end
+	self.storeByCamera[cameraName] = nil
+	self.ui:removeTrack(cameraName)
+	CameraResolver.destroy(cameraName)
+	self.lastCam = nil
+	self.currentTime = 0
+	self.isPlaying = false
+	self:_updatePlaybackButton()
+	self.ui:clearKeyframeProperties()
+	self.ui:setEditSectionVisible(false)
+	self:updatePlayhead()
+	self:updateTimeLabel()
+	self:_refreshTimelineHeight()
+	return true
 end
 
 function module:setEditMode(mode)
