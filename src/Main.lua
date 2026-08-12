@@ -1,4 +1,4 @@
-local DEV_VERSION = "2026-08-12-world-visuals"
+local DEV_VERSION = "2026-08-12-playback-reset"
 local _cache = {}
 local Dev = _G.__RoEditorDev
 if not Dev or Dev.__RoEditorVersion ~= DEV_VERSION then

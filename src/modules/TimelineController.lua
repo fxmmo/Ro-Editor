@@ -374,6 +374,12 @@ function module:togglePlayback()
 	end
 end
 function module:play()
+	if self.currentTime >= Config.MaxTime then
+		self.currentTime = 0
+		self:updateCameraByTime()
+		self:updatePlayhead()
+		self:updateTimeLabel()
+	end
 	self.isPlaying = true
 	self:_updatePlaybackButton()
 end
@@ -384,6 +390,9 @@ end
 function module:stop()
 	self.isPlaying = false
 	self.currentTime = 0
+	self:updateCameraByTime()
+	self:updatePlayhead()
+	self:updateTimeLabel()
 	self:_updatePlaybackButton()
 end
 
