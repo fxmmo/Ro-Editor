@@ -25,6 +25,7 @@ local Icons = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs
 local Theme = ThemeConfig.Theme
 local Config = ThemeConfig.Config
 local CameraResolver = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/CameraResolver.lua") or error("[Ro-Editor] import failed")
+local WorldVisuals = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/WorldVisuals.lua") or error("[Ro-Editor] import failed")
 local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua") or error("[Ro-Editor] import failed")
 local _nextCamId = 1
 
@@ -46,6 +47,7 @@ function module.new(interface, store, handles)
 	self.playerCamera = workspace.CurrentCamera
 	self.cameraLock = nil
 	self.tweenConnection = nil
+	self.visuals = WorldVisuals.new()
 	self.storeByCamera = {}
 	self.connections = {}
 	self.ui.onTrackSelected = function(cameraName)
@@ -156,6 +158,7 @@ function module:addCamera()
 		return nil
 	end
 	self.lastCam = camData
+	self.visuals:addCamera(camData)
 
 	self.ui:ensureTrack(name)
 	self.ui:setActiveCamera(name)
@@ -189,12 +192,14 @@ function module:deleteCamera()
 	self.editMode = false
 	self.editTool = "move"
 	self.handles:show(false)
+	self.visuals:setVisible(true)
 	if self.cameraMode then
 		self.cameraMode = false
 		self.ui:setViewToggle(false)
 		self:_restorePlayerCamera()
 	end
 	self.storeByCamera[cameraName] = nil
+	self.visuals:removeCamera(cameraName)
 	self.ui:removeTrack(cameraName)
 	CameraResolver.destroy(cameraName)
 	self.lastCam = nil
@@ -300,6 +305,7 @@ end
 
 function module:_applyCameraMode()
 	if not self.cameraMode then
+		self.visuals:setVisible(true)
 		self:_restorePlayerCamera()
 		return
 	end
@@ -307,6 +313,7 @@ function module:_applyCameraMode()
 	if not entry or not entry.camera then
 		self.cameraMode = false
 		self.ui:setViewToggle(false)
+		self.visuals:setVisible(true)
 		self:_restorePlayerCamera()
 		return
 	end
@@ -314,6 +321,7 @@ function module:_applyCameraMode()
 	if current and current ~= entry.camera and not self:_isEditorCamera(current) then
 		self.playerCamera = current
 	end
+	self.visuals:setVisible(false)
 	entry.camera.CameraType = Enum.CameraType.Scriptable
 	workspace.CurrentCamera = entry.camera
 	self.previewCamera = entry.camera
@@ -405,6 +413,7 @@ function module:addKeyframe()
 	store:add(data)
 	store:setSelected(data)
 	self.ui:setKeyframeProperties(data)
+	self.visuals:setKeyframes(camName, store:sorted())
 
 	local record = self.ui:createKeyframeVisual(camName, time, data)
 	data.frame = record.diamond
@@ -422,6 +431,7 @@ function module:updateSelectedKeyframe()
 	selected.cframe = entry.part.CFrame
 	selected.position = entry.part.Position
 	selected.orientation = entry.part.Orientation
+	self.visuals:updateKeyframe(self.lastCam.name, selected)
 	self.ui:setKeyframeProperties(selected)
 end
 
@@ -443,6 +453,7 @@ function module:applySelectedKeyframeProperties(values)
 	selected.position = position
 	selected.orientation = orientation
 	selected.cframe = cframe
+	self.visuals:updateKeyframe(self.lastCam.name, selected)
 	self.ui:setKeyframeProperties(selected)
 	if self.cameraMode then
 		self:_applyCameraMode()
@@ -520,6 +531,7 @@ function module:deleteKeyframe()
 
 	self.ui:removeKeyframeVisual(camName, selected.time)
 	store:remove(selected)
+	self.visuals:setKeyframes(camName, store:sorted())
 
 	self.deleteBtn.BackgroundColor3 = Theme.Danger
 	task.delay(0.2, function() self.deleteBtn.BackgroundColor3 = Theme.Panel end)
@@ -600,6 +612,7 @@ function module:startLoop()
 			end
 		end
 
+		self.visuals:sync()
 		self:updatePlayhead()
 		self:updateTimeLabel()
 	end)
@@ -620,6 +633,7 @@ function module:destroy()
 	end
 	self.connections = {}
 	if self.handles then self.handles:destroy() end
+	if self.visuals then self.visuals:destroy() end
 end
 
 return module
