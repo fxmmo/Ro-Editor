@@ -69,6 +69,7 @@ function module.new()
 	self.gui.IgnoreGuiInset = true
 	self.gui.Parent = playerGui
 	self.modalOpen = false
+	self.editSectionOpen = false
 	self.tracks = {}
 	self.activeCameraName = nil
 	return self
@@ -283,6 +284,52 @@ function module:buildCamerasModal()
 	end
 	self.addCamButton = rowBtn("AddCamera", "Add Camera", Theme.Accent, 86)
 	self.editButton = rowBtn("EditCamera", "Edit Camera", Theme.Panel, 86)
+	local editSection = Instance.new("Frame")
+	editSection.Name = "EditCameraSection"
+	editSection.Size = UDim2.new(1, -24, 0, 72)
+	editSection.Position = UDim2.new(0, 12, 0, 138)
+	editSection.BackgroundColor3 = Theme.Header
+	editSection.BorderSizePixel = 0
+	editSection.Parent = panel
+	editSection.ZIndex = 52
+	UIFactory.corner(editSection, 4)
+	UIFactory.stroke(editSection, Theme.Border, 1)
+	UIFactory.label({
+		Parent = editSection,
+		Position = UDim2.new(0, 10, 0, 3),
+		Size = UDim2.new(1, -20, 0, 14),
+		Text = "EDIT CAMERA",
+		Font = Enum.Font.GothamBold,
+		TextSize = 9,
+		Color = Theme.TextDim,
+		ZIndex = 53,
+	})
+	self.editToolButtons = {}
+	local function editToolButton(name, text, x, mode)
+		local button = UIFactory.button({
+			Parent = editSection,
+			Position = UDim2.new(0, x, 0, 22),
+			Size = UDim2.new(0, 140, 0, 28),
+			Text = text,
+			Color = Theme.Panel,
+			Corner = 4,
+			TextSize = 10,
+			ZIndex = 53,
+		})
+		button.Name = name
+		button.MouseButton1Click:Connect(function()
+			self:setEditTool(mode)
+			if self.onEditToolSelected then
+				self.onEditToolSelected(mode)
+			end
+		end)
+		self.editToolButtons[mode] = button
+		return button
+	end
+	editToolButton("MoveCamera", "MOVE CAMERA", 0, "move")
+	editToolButton("RotateCamera", "ROTATE CAMERA", 152, "rotate")
+	self.editSection = editSection
+	editSection.Visible = false
 	local separator = Instance.new("Frame")
 	separator.Size = UDim2.new(1, -24, 0, 1)
 	separator.Position = UDim2.new(0, 12, 0, 130)
@@ -292,6 +339,7 @@ function module:buildCamerasModal()
 	separator.ZIndex = 52
 	self.propertiesInfo = UIFactory.label({
 		Parent = panel,
+		Name = "KeyframePropertiesInfo",
 		Position = UDim2.new(0, 12, 0, 141),
 		Size = UDim2.new(1, -24, 0, 16),
 		Text = "SELECT A KEYFRAME TO EDIT PROPERTIES",
@@ -467,6 +515,34 @@ function module:clearKeyframeProperties()
 	end
 end
 
+function module:setEditTool(mode)
+	if not self.editToolButtons then return end
+	for buttonMode, button in pairs(self.editToolButtons) do
+		local active = buttonMode == mode
+		button.BackgroundColor3 = active and Theme.Accent or Theme.Panel
+		button.TextColor3 = active and Theme.Text or Theme.TextDim
+	end
+	self.activeEditTool = mode
+end
+
+function module:setEditSectionVisible(visible)
+	if not self.editSection or not self.modalPanel then return false end
+	self.editSectionOpen = visible and true or false
+	self.editSection.Visible = self.editSectionOpen
+	local offset = self.editSectionOpen and 79 or 0
+	self.propertiesInfo.Position = UDim2.new(0, 12, 0, 141 + offset)
+	self.propertiesSection.Position = UDim2.new(0, 12, 0, 165 + offset)
+	self.modalPanel.Size = UDim2.new(0, 320, 0, 400 + offset)
+	if self.modalOpen then
+		self:repositionModal()
+	end
+	return self.editSectionOpen
+end
+
+function module:toggleEditSection()
+	return self:setEditSectionVisible(not self.editSectionOpen)
+end
+
 function module:setViewToggle(on, callback)
 	local t = self.viewToggle
 	if not t then return end
@@ -517,7 +593,8 @@ function module:repositionModal()
 	local btnSize = btn.AbsoluteSize
 	local panel = self.modalPanel
 
-	panel.Size = UDim2.new(0, 320, 0, 400)
+	local panelHeight = self.editSectionOpen and 479 or 400
+	panel.Size = UDim2.new(0, 320, 0, panelHeight)
 
 	local desiredX = btnAbs.X + btnSize.X - 320
 	local desiredY = btnAbs.Y + btnSize.Y + 6
@@ -525,7 +602,7 @@ function module:repositionModal()
 	local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize
 		or Vector2.new(panel.Parent.AbsoluteSize.X, panel.Parent.AbsoluteSize.Y)
 	desiredX = math.clamp(desiredX, 8, math.max(8, viewport.X - 328))
-	desiredY = math.clamp(desiredY, 8, math.max(8, viewport.Y - 408))
+	desiredY = math.clamp(desiredY, 8, math.max(8, viewport.Y - panelHeight - 8))
 
 	self._modalTargetPos = UDim2.new(0, desiredX, 0, desiredY)
 	panel.Position = self._modalTargetPos

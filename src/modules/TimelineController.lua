@@ -39,6 +39,7 @@ function module.new(interface, store, handles)
 	self.currentTime = 0
 	self.isDraggingPlayhead = false
 	self.editMode = false
+	self.editTool = "move"
 	self.cameraMode = false
 	self.lastCam = nil
 	self.playerCamera = workspace.CurrentCamera
@@ -86,9 +87,15 @@ end
 
 function module:setupModeButtons()
 	self.ui.editButton.MouseButton1Click:Connect(function()
-		self:toggleEditMode()
-		self.ui:closeCamerasModal()
+		local open = self.ui:toggleEditSection()
+		if not open then
+			self:setEditMode(nil)
+		end
 	end)
+	self.ui.onEditToolSelected = function(mode)
+		self:setEditMode(mode)
+		self.ui:closeCamerasModal()
+	end
 	self.ui.addCamButton.MouseButton1Click:Connect(function()
 		self:addCamera()
 		self.ui:closeCamerasModal()
@@ -138,6 +145,7 @@ function module:selectCamera(cameraName, preserveProperties)
 		self.ui:clearKeyframeProperties()
 	end
 	if self.editMode then
+		self.handles:setMode(self.editTool)
 		self.handles:setTarget(entry.part)
 		self.handles:show(true)
 	end
@@ -146,22 +154,33 @@ function module:selectCamera(cameraName, preserveProperties)
 	end
 end
 
-function module:toggleEditMode()
+function module:setEditMode(mode)
 	local entry = self:activeCam()
-	if not entry then
+	local enabled = mode == "move" or mode == "rotate"
+	if enabled and not entry then
 		self.editMode = false
 		self.handles:show(false)
 		return
 	end
-
-	if not self.editMode and self.cameraMode then
+	if enabled and self.cameraMode then
 		self.cameraMode = false
 		self.ui:setViewToggle(false)
 		self:_applyCameraMode()
 	end
-	self.editMode = not self.editMode
+	self.editMode = enabled
+	self.editTool = enabled and mode or "move"
+	if not enabled then
+		self.handles:show(false)
+		return
+	end
+	self.ui:setEditTool(self.editTool)
+	self.handles:setMode(self.editTool)
 	self.handles:setTarget(entry.part)
-	self.handles:show(self.editMode)
+	self.handles:show(true)
+end
+
+function module:toggleEditMode()
+	self:setEditMode(self.editMode and nil or "move")
 end
 
 function module:_isEditorCamera(camera)

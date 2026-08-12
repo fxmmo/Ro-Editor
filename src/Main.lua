@@ -1,6 +1,7 @@
+local DEV_VERSION = "2026-08-12-ruler-arc-handles"
 local _cache = {}
 local Dev = _G.__RoEditorDev
-if not Dev then
+if not Dev or Dev.__RoEditorVersion ~= DEV_VERSION then
 	Dev = {}
 	function Dev:Import(url)
 		if _cache[url] then
@@ -24,6 +25,7 @@ if not Dev then
 		end
 		return nil
 	end
+	Dev.__RoEditorVersion = DEV_VERSION
 	_G.__RoEditorDev = Dev
 end
 

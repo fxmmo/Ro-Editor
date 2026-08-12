@@ -1,4 +1,3 @@
-local Players = game:GetService("Players")
 local Dev = _G.__RoEditorDev
 if not Dev then
 	local _cache = {}
@@ -18,6 +17,7 @@ if not Dev then
 	end
 	_G.__RoEditorDev = Dev
 end
+local Players = game:GetService("Players")
 local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua") or error("[Ro-Editor] import failed")
 local Theme = ThemeConfig.Theme
 
@@ -42,6 +42,8 @@ local AXES = {
 	},
 }
 
+local ROTATION_AXES = Axes.new(Enum.Axis.X, Enum.Axis.Y, Enum.Axis.Z)
+
 local FACE_DIRECTIONS = {
 	[Enum.NormalId.Left] = Vector3.new(-1, 0, 0),
 	[Enum.NormalId.Right] = Vector3.new(1, 0, 0),
@@ -51,15 +53,24 @@ local FACE_DIRECTIONS = {
 	[Enum.NormalId.Front] = Vector3.new(0, 0, -1),
 }
 
+local AXIS_VECTORS = {
+	[Enum.Axis.X] = Vector3.new(1, 0, 0),
+	[Enum.Axis.Y] = Vector3.new(0, 1, 0),
+	[Enum.Axis.Z] = Vector3.new(0, 0, 1),
+}
+
 function module.new()
 	local self = setmetatable({}, module)
 	self.handles = {}
+	self.arcHandles = nil
 	self.connections = {}
 	self.selectedTarget = nil
 	self.dragStartCFrame = nil
 	self.dragFace = nil
+	self.dragAxis = nil
 	self.isDragging = false
 	self.visible = false
+	self.mode = "move"
 	self.onChanged = nil
 	self:build()
 	self:show(false)
@@ -81,13 +92,13 @@ function module:build()
 		handle.Transparency = 0
 		handle.Faces = axis.faces
 		self.connections[#self.connections + 1] = handle.MouseButton1Down:Connect(function(face)
-			if not self.visible or not self.selectedTarget or not self.selectedTarget.Parent then return end
+			if not self.visible or self.mode ~= "move" or not self.selectedTarget or not self.selectedTarget.Parent then return end
 			self.dragFace = face
 			self.dragStartCFrame = self.selectedTarget.CFrame
 			self.isDragging = true
 		end)
 		self.connections[#self.connections + 1] = handle.MouseDrag:Connect(function(face, distance)
-			if not self.isDragging or face ~= self.dragFace then return end
+			if not self.isDragging or self.mode ~= "move" or face ~= self.dragFace then return end
 			if not self.selectedTarget or not self.selectedTarget.Parent or not self.dragStartCFrame then
 				self:stopDrag()
 				return
@@ -109,6 +120,48 @@ function module:build()
 		end)
 		self.handles[#self.handles + 1] = handle
 	end
+
+	local arcHandles = Instance.new("ArcHandles")
+	arcHandles.Name = "CameraArcHandles"
+	arcHandles.Axes = ROTATION_AXES
+	arcHandles.Color3 = Theme.Accent or Color3.fromRGB(0, 170, 255)
+	arcHandles.Transparency = 0
+	self.connections[#self.connections + 1] = arcHandles.MouseButton1Down:Connect(function(axis)
+		if not self.visible or self.mode ~= "rotate" or not self.selectedTarget or not self.selectedTarget.Parent then return end
+		self.dragAxis = axis
+		self.dragStartCFrame = self.selectedTarget.CFrame
+		self.isDragging = true
+	end)
+	self.connections[#self.connections + 1] = arcHandles.MouseDrag:Connect(function(axis, relativeAngle)
+		if not self.isDragging or self.mode ~= "rotate" or axis ~= self.dragAxis then return end
+		if not self.selectedTarget or not self.selectedTarget.Parent or not self.dragStartCFrame then
+			self:stopDrag()
+			return
+		end
+		local axisVector = AXIS_VECTORS[axis]
+		if not axisVector then return end
+		local cframe = self.dragStartCFrame * CFrame.fromAxisAngle(axisVector, relativeAngle)
+		self.selectedTarget.CFrame = cframe
+		local childCamera = self.selectedTarget:FindFirstChildOfClass("Camera")
+		if childCamera then
+			childCamera.CFrame = cframe
+		end
+		if self.onChanged then
+			self.onChanged(self.selectedTarget, cframe)
+		end
+	end)
+	self.connections[#self.connections + 1] = arcHandles.MouseButton1Up:Connect(function()
+		self:stopDrag()
+	end)
+	self.arcHandles = arcHandles
+end
+
+function module:setMode(mode)
+	self.mode = mode == "rotate" and "rotate" or "move"
+	if self.isDragging then
+		self:stopDrag()
+	end
+	self:_updateParents()
 end
 
 function module:setTarget(target)
@@ -116,8 +169,23 @@ function module:setTarget(target)
 	for _, handle in ipairs(self.handles) do
 		handle.Adornee = target
 	end
+	if self.arcHandles then
+		self.arcHandles.Adornee = target
+	end
 	if not target then
 		self:show(false)
+	else
+		self:_updateParents()
+	end
+end
+
+function module:_updateParents()
+	local parent = self.visible and self:getPlayerGui() or nil
+	for _, handle in ipairs(self.handles) do
+		handle.Parent = self.mode == "move" and parent or nil
+	end
+	if self.arcHandles then
+		self.arcHandles.Parent = self.mode == "rotate" and parent or nil
 	end
 end
 
@@ -126,10 +194,7 @@ function module:show(visible)
 	if not self.visible then
 		self:stopDrag()
 	end
-	local parent = self.visible and self:getPlayerGui() or nil
-	for _, handle in ipairs(self.handles) do
-		handle.Parent = parent
-	end
+	self:_updateParents()
 end
 
 function module:update()
@@ -144,6 +209,7 @@ end
 function module:stopDrag()
 	self.isDragging = false
 	self.dragFace = nil
+	self.dragAxis = nil
 	self.dragStartCFrame = nil
 end
 
@@ -156,6 +222,10 @@ function module:destroy()
 		handle:Destroy()
 	end
 	self.handles = {}
+	if self.arcHandles then
+		self.arcHandles:Destroy()
+		self.arcHandles = nil
+	end
 end
 
 return module
