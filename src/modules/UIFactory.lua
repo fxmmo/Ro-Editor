@@ -155,10 +155,20 @@ function module.button(props)
 	return b
 end
 
+function module.getIcon(button)
+	if not button then return nil end
+	return button:FindFirstChild("Icon") or (button.Parent and button.Parent:FindFirstChild(button.Name .. "Icon"))
+end
+
+function module.getLabel(button)
+	if not button then return nil end
+	return button:FindFirstChild("ButtonLabel")
+end
+
 function module.setIcon(button, assetId, options)
 	if not button or not assetId then return nil end
 	options = options or {}
-	local icon = button:FindFirstChild("Icon")
+	local icon = module.getIcon(button)
 	if not icon then
 		icon = Instance.new("ImageLabel")
 		icon.Name = "Icon"
@@ -183,21 +193,37 @@ function module.setIcon(button, assetId, options)
 		if options.Position == nil then
 			icon.AnchorPoint = Vector2.new(0.5, 0.5)
 		end
+		local label = module.getLabel(button)
+		if label then label:Destroy() end
 	else
-		button.TextXAlignment = Enum.TextXAlignment.Center
-		local iconOffset = options.TextOffset or 20
-		local iconWidth = (options.Size and options.Size.X.Offset or 16)
-		icon.Position = UDim2.new(0, iconOffset, 0.5, -8)
-		local padding = button:FindFirstChild("IconPadding")
-		if not padding then
-			padding = Instance.new("UIPadding")
-			padding.Name = "IconPadding"
-			padding.Parent = button
+		local text = button.Text
+		local label = module.getLabel(button)
+		if not label then
+			label = Instance.new("TextLabel")
+			label.Name = "ButtonLabel"
+			label.BackgroundTransparency = 1
+			label.BorderSizePixel = 0
+			label.Font = button.Font
+			label.TextSize = button.TextSize
+			label.TextColor3 = button.TextColor3
+			label.TextStrokeTransparency = button.TextStrokeTransparency
+			label.TextXAlignment = Enum.TextXAlignment.Center
+			label.TextYAlignment = Enum.TextYAlignment.Center
+			label.TextWrapped = false
+			label.Parent = button
 		end
-		padding.PaddingLeft = UDim.new(0, iconOffset + iconWidth + 4)
-		padding.PaddingTop = UDim.new(0, 0)
-		padding.PaddingBottom = UDim.new(0, 0)
-		padding.PaddingRight = UDim.new(0, 0)
+		if text ~= "" then
+			label.Text = text
+		end
+		button.Text = ""
+		button.TextXAlignment = Enum.TextXAlignment.Center
+		local iconOffset = options.TextOffset or 12
+		local iconWidth = options.Size and options.Size.X.Offset or 16
+		local gap = options.Gap or 4
+		icon.Position = UDim2.new(0, iconOffset, 0.5, -math.floor((options.Size and options.Size.Y.Offset or 16) / 2))
+		label.Position = UDim2.new(0, iconOffset + iconWidth + gap, 0, 0)
+		label.Size = UDim2.new(1, -(iconOffset + iconWidth + gap + 8), 1, 0)
+		label.ZIndex = options.LabelZIndex or button.ZIndex + 1
 	end
 	return icon
 end

@@ -18,6 +18,7 @@ if not Dev then
 	_G.__RoEditorDev = Dev
 end
 local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua") or error("[Ro-Editor] import failed")
 local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua") or error("[Ro-Editor] import failed")
@@ -46,16 +47,26 @@ function module.new()
 	local self = setmetatable({}, module)
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui")
-	for _, child in ipairs(playerGui:GetChildren()) do
-		if child:IsA("ScreenGui") and child.Name == "StudioTimelineSystem" then
-			child:Destroy()
-		end
+	local containers = {playerGui, CoreGui}
+	for _, container in ipairs(containers) do
+		pcall(function()
+			for _, child in ipairs(container:GetChildren()) do
+				if child:IsA("ScreenGui") and child.Name == "StudioTimelineSystem" then
+					child:Destroy()
+				end
+			end
+		end)
 	end
 	self.gui = Instance.new("ScreenGui")
 	self.gui.Name = "StudioTimelineSystem"
 	self.gui.ResetOnSpawn = false
 	self.gui.IgnoreGuiInset = true
-	self.gui.Parent = playerGui
+	local parentedToCoreGui = pcall(function()
+		self.gui.Parent = CoreGui
+	end)
+	if not parentedToCoreGui or not self.gui.Parent then
+		self.gui.Parent = playerGui
+	end
 	self.modalOpen = false
 	self.editSectionOpen = false
 	self.timelineMinimized = false
@@ -573,7 +584,11 @@ function module:setEditTool(mode)
 			local active = buttonMode == mode
 			button.BackgroundColor3 = active and Theme.Accent or Theme.Panel
 			button.TextColor3 = active and Theme.Text or Theme.TextDim
-			local icon = button:FindFirstChild("Icon")
+			local label = UIFactory.getLabel(button)
+			if label then
+				label.TextColor3 = active and Theme.Text or Theme.TextDim
+			end
+			local icon = UIFactory.getIcon(button)
 			if icon then
 				icon.ImageColor3 = active and Theme.Text or Theme.TextDim
 			end
