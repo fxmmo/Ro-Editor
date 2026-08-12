@@ -27,7 +27,7 @@ local module = {}
 module.__index = module
 
 local TRACK_PADDING = 8
-local KF_LABEL_OFFSET = 100
+local KF_LABEL_OFFSET = 180
 local TIMELINE_AXIS_LEFT = TRACK_PADDING + KF_LABEL_OFFSET
 local TIMELINE_AXIS_RIGHT = 26
 
@@ -57,11 +57,17 @@ end
 function module.new()
 	local self = setmetatable({}, module)
 	local player = Players.LocalPlayer
+	local playerGui = player:WaitForChild("PlayerGui")
+	for _, child in ipairs(playerGui:GetChildren()) do
+		if child:IsA("ScreenGui") and child.Name == "StudioTimelineSystem" then
+			child:Destroy()
+		end
+	end
 	self.gui = Instance.new("ScreenGui")
 	self.gui.Name = "StudioTimelineSystem"
 	self.gui.ResetOnSpawn = false
 	self.gui.IgnoreGuiInset = true
-	self.gui.Parent = player:WaitForChild("PlayerGui")
+	self.gui.Parent = playerGui
 	self.modalOpen = false
 	self.tracks = {}
 	self.activeCameraName = nil
@@ -526,6 +532,9 @@ function module:repositionModal()
 end
 
 function module:buildTimelinePanel()
+	if self.timelinePanel and self.timelinePanel.Parent then
+		self.timelinePanel:Destroy()
+	end
 	local panel = UIFactory.frame({
 		Parent = self.gui,
 		Size = UDim2.new(1, 0, 0, 160),
@@ -534,6 +543,7 @@ function module:buildTimelinePanel()
 		Name = "TimelinePanel",
 		ZIndex = 10,
 	})
+	self.timelinePanel = panel
 	UIFactory.stroke(panel, Theme.Border, 1)
 	UIFactory.shadow(panel, 0.1)
 
@@ -571,6 +581,7 @@ function module:buildTimelinePanel()
 
 	self.timeLabel = UIFactory.label({
 		Parent = header,
+		Name = "TimeLabel",
 		Position = UDim2.new(1, -120, 0, 0),
 		Size = UDim2.new(0, 110, 1, 0),
 		Text = "00:00 / 00:10",
@@ -616,6 +627,9 @@ function module:buildTimelinePanel()
 end
 
 function module:buildRuler()
+	if self.ruler and self.ruler.Parent then
+		self.ruler:Destroy()
+	end
 	local ruler = UIFactory.frame({
 		Parent = self.area,
 		Size = UDim2.new(1, -TIMELINE_AXIS_LEFT - TIMELINE_AXIS_RIGHT, 0, 22),
@@ -624,6 +638,7 @@ function module:buildRuler()
 		Name = "Ruler",
 		ZIndex = 30,
 	})
+	self.ruler = ruler
 	ruler.BackgroundTransparency = 1
 
 	local maxTime = getMaxTime()
@@ -749,7 +764,7 @@ function module:ensureTrack(cameraName)
 
 	local kfContainer = Instance.new("Frame")
 	kfContainer.Name = "Keyframes"
-	kfContainer.Size = UDim2.new(1, -110, 1, 0)
+	kfContainer.Size = UDim2.new(1, -KF_LABEL_OFFSET - 10, 1, 0)
 	kfContainer.Position = UDim2.new(0, KF_LABEL_OFFSET, 0, 0)
 	kfContainer.BackgroundTransparency = 1
 	kfContainer.ClipsDescendants = true

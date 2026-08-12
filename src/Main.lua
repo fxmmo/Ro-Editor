@@ -51,7 +51,6 @@ function System.new()
 	self.handles = HandleSystem.new()
 	self.interface = Interface.new()
 	self.interface:buildTopBar()
-	self.interface:buildTimelinePanel()
 	self.controller = TimelineController.new(self.interface, self.store, self.handles)
 	return self
 end
