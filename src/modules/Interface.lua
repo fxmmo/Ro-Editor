@@ -21,6 +21,7 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua") or error("[Ro-Editor] import failed")
 local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua") or error("[Ro-Editor] import failed")
+local Icons = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Icon_Config.lua") or error("[Ro-Editor] import failed")
 local Theme = ThemeConfig.Theme
 local Config = ThemeConfig.Config
 local module = {}
@@ -157,6 +158,12 @@ function module:buildTopBar()
 		Corner = 4,
 		ZIndex = 11,
 	})
+	UIFactory.setIcon(self.camerasButton, Icons.Camera, {
+		Color = Theme.Text,
+		TextOffset = 28,
+		Size = UDim2.new(0, 16, 0, 16),
+		Position = UDim2.new(0, 8, 0.5, -8),
+	})
 
 	self:buildCamerasModal()
 	self:buildTimelinePanel()
@@ -219,7 +226,13 @@ function module:buildCamerasModal()
 	closeBtn.Font = Enum.Font.GothamBold
 	closeBtn.TextSize = 13
 	closeBtn.TextColor3 = Theme.TextDim
-	closeBtn.Text = "×"
+	closeBtn.Text = ""
+	UIFactory.setIcon(closeBtn, Icons.X, {
+		IconOnly = true,
+		Color = Theme.TextDim,
+		Size = UDim2.new(0, 14, 0, 14),
+		Position = UDim2.new(0.5, -7, 0.5, -7),
+	})
 	closeBtn.AutoButtonColor = false
 	closeBtn.Parent = header
 	closeBtn.ZIndex = 53
@@ -237,11 +250,17 @@ function module:buildCamerasModal()
 	switchRow.ZIndex = 52
 	UIFactory.corner(switchRow, 4)
 	UIFactory.stroke(switchRow, Theme.Border, 1)
+	UIFactory.setIcon(switchRow, Icons.Eye, {
+		IconOnly = true,
+		Color = Theme.TextDim,
+		Size = UDim2.new(0, 16, 0, 16),
+		Position = UDim2.new(0, 10, 0.5, -8),
+	})
 	UIFactory.label({
 		Parent = switchRow,
-		Position = UDim2.new(0, 10, 0, 0),
-		Size = UDim2.new(1, -60, 1, 0),
-		Text = "View Camera",
+			Position = UDim2.new(0, 34, 0, 0),
+			Size = UDim2.new(1, -84, 1, 0),
+			Text = "View Camera",
 		Font = Enum.Font.GothamBold,
 		TextSize = 12,
 		Color = Theme.Text,
@@ -310,6 +329,9 @@ function module:buildCamerasModal()
 	self.addCamButton = rowBtn("AddCamera", "Add Camera", Theme.Accent, 86, 140, 12)
 	self.editButton = rowBtn("EditCamera", "Edit Camera", Theme.Panel, 86, 140, 164)
 	self.deleteCamButton = rowBtn("DeleteCamera", "Delete Camera", Theme.Danger, 122, 296, 12)
+	UIFactory.setIcon(self.addCamButton, Icons.Plus, {Color = Theme.Text, TextOffset = 28})
+	UIFactory.setIcon(self.editButton, Icons.Pencil, {Color = Theme.Text, TextOffset = 28})
+	UIFactory.setIcon(self.deleteCamButton, Icons.Trash, {Color = Theme.Text, TextOffset = 28})
 	local editSection = Instance.new("Frame")
 	editSection.Name = "EditCameraSection"
 	editSection.Size = UDim2.new(1, -24, 0, 82)
@@ -342,8 +364,12 @@ function module:buildCamerasModal()
 			TextSize = 10,
 			ZIndex = 53,
 		})
-		button.Name = name
-		button.MouseButton1Click:Connect(function()
+			button.Name = name
+			UIFactory.setIcon(button, mode == "move" and Icons.Move3D or Icons.Rotate3D, {
+				Color = Theme.TextDim,
+				TextOffset = 28,
+			})
+			button.MouseButton1Click:Connect(function()
 			self:setEditTool(mode)
 			if self.onEditToolSelected then
 				self.onEditToolSelected(mode)
@@ -449,8 +475,9 @@ function module:buildCamerasModal()
 		Corner = 4,
 		TextSize = 10,
 		ZIndex = 53,
-	})
-	apply.MouseButton1Click:Connect(function()
+		})
+		UIFactory.setIcon(apply, Icons.Check, {Color = Theme.Text, TextOffset = 28})
+		apply.MouseButton1Click:Connect(function()
 		if self.onPropertiesSubmitted then
 			self.onPropertiesSubmitted(self:getPropertyValues())
 		end
@@ -464,8 +491,9 @@ function module:buildCamerasModal()
 		Corner = 4,
 		TextSize = 10,
 		ZIndex = 53,
-	})
-	reset.MouseButton1Click:Connect(function()
+		})
+		UIFactory.setIcon(reset, Icons.RotateCCW, {Color = Theme.Text, TextOffset = 28})
+		reset.MouseButton1Click:Connect(function()
 		if self.propertyKeyframe then
 			self:setKeyframeProperties(self.propertyKeyframe)
 		end
@@ -543,11 +571,15 @@ end
 
 function module:setEditTool(mode)
 	if not self.editToolButtons then return end
-	for buttonMode, button in pairs(self.editToolButtons) do
-		local active = buttonMode == mode
-		button.BackgroundColor3 = active and Theme.Accent or Theme.Panel
-		button.TextColor3 = active and Theme.Text or Theme.TextDim
-	end
+		for buttonMode, button in pairs(self.editToolButtons) do
+			local active = buttonMode == mode
+			button.BackgroundColor3 = active and Theme.Accent or Theme.Panel
+			button.TextColor3 = active and Theme.Text or Theme.TextDim
+			local icon = button:FindFirstChild("Icon")
+			if icon then
+				icon.ImageColor3 = active and Theme.Text or Theme.TextDim
+			end
+		end
 	self.activeEditTool = mode
 end
 
@@ -648,7 +680,11 @@ function module:setTimelineMinimized(minimized)
 		self.area.Visible = not self.timelineMinimized
 	end
 	if self.timelineMinimizeButton then
-		self.timelineMinimizeButton.Text = self.timelineMinimized and "+" or "-"
+		self.timelineMinimizeButton.Text = ""
+		local icon = self.timelineMinimizeButton:FindFirstChild("Icon")
+		if icon then
+			icon.Image = self.timelineMinimized and Icons.Maximize or Icons.Minus
+		end
 	end
 	if not self.timelineMinimized then
 		self:refreshTimelineAxis()
@@ -722,11 +758,17 @@ function module:buildTimelinePanel()
 		Name = "MinimizeTimeline",
 		Position = UDim2.new(1, -154, 0.5, -12),
 		Size = UDim2.new(0, 28, 0, 24),
-		Text = "-",
+		Text = "",
 		Color = Theme.Panel,
 		Corner = 4,
 		TextSize = 16,
 		ZIndex = 13,
+	})
+	UIFactory.setIcon(self.timelineMinimizeButton, Icons.Minus, {
+		IconOnly = true,
+		Color = Theme.TextDim,
+		Size = UDim2.new(0, 14, 0, 14),
+		Position = UDim2.new(0.5, -7, 0.5, -7),
 	})
 	self.timelineMinimizeButton.MouseButton1Click:Connect(function()
 		self:setTimelineMinimized(not self.timelineMinimized)
@@ -1096,7 +1138,7 @@ function module:updatePlayheadProximity(time, pixelPos)
 	end
 end
 
-function module:createControlButton(index, text, color, callback)
+function module:createControlButton(index, text, color, callback, icon)
 	local btn = UIFactory.button({
 		Parent = self.controls,
 		Position = UDim2.new(0, 6 + (index - 1) * 46, 0.5, -12),
@@ -1107,6 +1149,14 @@ function module:createControlButton(index, text, color, callback)
 		TextSize = 12,
 		ZIndex = 13,
 	})
+	if icon then
+		UIFactory.setIcon(btn, icon, {
+			IconOnly = true,
+			Color = Theme.TextDim,
+			Size = UDim2.new(0, 15, 0, 15),
+			Position = UDim2.new(0.5, -7, 0.5, -7),
+		})
+	end
 	btn.MouseButton1Click:Connect(callback)
 	return btn
 end

@@ -155,6 +155,41 @@ function module.button(props)
 	return b
 end
 
+function module.setIcon(button, assetId, options)
+	if not button or not assetId then return nil end
+	options = options or {}
+	local icon = button:FindFirstChild("Icon")
+	if not icon then
+		icon = Instance.new("ImageLabel")
+		icon.Name = "Icon"
+		icon.BackgroundTransparency = 1
+		icon.BorderSizePixel = 0
+		icon.ScaleType = Enum.ScaleType.Fit
+		icon.Parent = button
+	end
+	icon.Image = assetId
+	icon.ImageColor3 = options.Color or Theme.Text
+	icon.ImageTransparency = options.Transparency or 0
+	icon.Size = options.Size or UDim2.new(0, 16, 0, 16)
+	icon.Position = options.Position or UDim2.new(0, 8, 0.5, -8)
+	icon.AnchorPoint = options.AnchorPoint or Vector2.new(0, 0)
+	icon.ZIndex = options.ZIndex or button.ZIndex + 1
+	if options.IconOnly then
+		button.Text = ""
+		button.TextXAlignment = Enum.TextXAlignment.Center
+	elseif options.TextOffset then
+		button.TextXAlignment = Enum.TextXAlignment.Left
+		local padding = button:FindFirstChild("IconPadding")
+		if not padding then
+			padding = Instance.new("UIPadding")
+			padding.Name = "IconPadding"
+			padding.Parent = button
+		end
+		padding.PaddingLeft = UDim.new(0, options.TextOffset)
+	end
+	return icon
+end
+
 function module.iconButton(props)
 	local container = module.frame({
 		Parent = props.Parent,

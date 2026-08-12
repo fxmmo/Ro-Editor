@@ -21,6 +21,7 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua") or error("[Ro-Editor] import failed")
+local Icons = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Icon_Config.lua") or error("[Ro-Editor] import failed")
 local Theme = ThemeConfig.Theme
 local Config = ThemeConfig.Config
 local CameraResolver = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/CameraResolver.lua") or error("[Ro-Editor] import failed")
@@ -334,23 +335,28 @@ function module:_refreshTimelineHeight()
 end
 
 function module:setupButtons()
-	self.playBtn = self.ui:createControlButton(1, "▶", Theme.Panel, function()
+	self.playBtn = self.ui:createControlButton(1, "", Theme.Panel, function()
 		self:togglePlayback()
-	end)
-	self.stopBtn = self.ui:createControlButton(2, "⏹", Theme.Panel, function()
+	end, Icons.Play)
+	self.stopBtn = self.ui:createControlButton(2, "", Theme.Panel, function()
 		self:stop()
-	end)
-	self.addBtn = self.ui:createControlButton(3, "＋", Theme.Panel, function()
+	end, Icons.Square)
+	self.addBtn = self.ui:createControlButton(3, "", Theme.Panel, function()
 		self:addKeyframe()
-	end)
-	self.deleteBtn = self.ui:createControlButton(4, "✕", Theme.Panel, function()
+	end, Icons.Plus)
+	self.deleteBtn = self.ui:createControlButton(4, "", Theme.Panel, function()
 		self:deleteKeyframe()
-	end)
+	end, Icons.Trash)
 end
 function module:_updatePlaybackButton()
 	if not self.playBtn then return end
-	self.playBtn.Text = self.isPlaying and "⏸" or "▶"
+	self.playBtn.Text = ""
 	self.playBtn.BackgroundColor3 = self.isPlaying and Theme.Success or Theme.Panel
+	local icon = self.playBtn:FindFirstChild("Icon")
+	if icon then
+		icon.Image = self.isPlaying and Icons.Pause or Icons.Play
+		icon.ImageColor3 = self.isPlaying and Theme.Text or Theme.TextDim
+	end
 end
 function module:togglePlayback()
 	if self.isPlaying then
