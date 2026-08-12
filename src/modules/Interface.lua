@@ -164,6 +164,19 @@ function module:buildCamerasModal()
 		ZIndex = 52,
 	})
 	UIFactory.stroke(header, Theme.Border, 1)
+	local headerAccent = Instance.new("Frame")
+	headerAccent.Size = UDim2.new(1, 0, 0, 2)
+	headerAccent.BackgroundColor3 = Theme.Accent
+	headerAccent.BorderSizePixel = 0
+	headerAccent.Parent = header
+	headerAccent.ZIndex = 13
+	local headerGradient = Instance.new("UIGradient")
+	headerGradient.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Theme.Header),
+		ColorSequenceKeypoint.new(1, Theme.Panel),
+	}
+	headerGradient.Rotation = 90
+	headerGradient.Parent = header
 
 	UIFactory.label({
 		Parent = header,
@@ -372,7 +385,14 @@ function module:buildTimelinePanel()
 		ZIndex = 10,
 	})
 	UIFactory.stroke(panel, Theme.Border, 1)
-	UIFactory.shadow(panel, 0.1)
+	UIFactory.shadow(panel, 0.12)
+	local panelGradient = Instance.new("UIGradient")
+	panelGradient.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Theme.TimelineSurface or Theme.Background),
+		ColorSequenceKeypoint.new(1, Theme.PanelDark),
+	}
+	panelGradient.Rotation = 90
+	panelGradient.Parent = panel
 
 	local header = UIFactory.frame({
 		Parent = panel,
@@ -388,10 +408,20 @@ function module:buildTimelinePanel()
 		Parent = header,
 		Position = UDim2.new(0, 14, 0, 0),
 		Size = UDim2.new(0, 120, 1, 0),
-		Text = "Animation Editor",
+		Text = "CAMERA SEQUENCER",
 		Font = Enum.Font.GothamBold,
-		TextSize = 13,
+		TextSize = 12,
 		Color = Theme.Text,
+		ZIndex = 12,
+	})
+	UIFactory.label({
+		Parent = header,
+		Position = UDim2.new(0, 14, 0, 19),
+		Size = UDim2.new(0, 126, 0, 11),
+		Text = "TIMELINE EDITOR",
+		Font = Enum.Font.GothamMedium,
+		TextSize = 8,
+		Color = Theme.TextMuted,
 		ZIndex = 12,
 	})
 
@@ -404,7 +434,14 @@ function module:buildTimelinePanel()
 		Name = "Controls",
 		ZIndex = 12,
 	})
-	UIFactory.stroke(self.controls, Theme.Border, 1, 0.5)
+	UIFactory.stroke(self.controls, Theme.Border, 1, 0.4)
+	local controlsGradient = Instance.new("UIGradient")
+	controlsGradient.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Theme.Panel:Lerp(Theme.Header, 0.35)),
+		ColorSequenceKeypoint.new(1, Theme.PanelDark),
+	}
+	controlsGradient.Rotation = 90
+	controlsGradient.Parent = self.controls
 
 	self.timeLabel = UIFactory.label({
 		Parent = header,
@@ -422,12 +459,19 @@ function module:buildTimelinePanel()
 		Parent = panel,
 		Size = UDim2.new(1, -20, 1, -44),
 		Position = UDim2.new(0, 10, 0, 38),
-		Color = Theme.PanelDark,
+		Color = Theme.TimelineSurface or Theme.PanelDark,
 		Corner = 6,
 		Name = "TimelineArea",
 		ZIndex = 11,
 	})
 	UIFactory.stroke(self.area, Theme.Border, 1, 0.6)
+	local areaGradient = Instance.new("UIGradient")
+	areaGradient.Color = ColorSequence.new{
+		ColorSequenceKeypoint.new(0, Theme.TimelineSurface or Theme.PanelDark),
+		ColorSequenceKeypoint.new(1, Theme.Background),
+	}
+	areaGradient.Rotation = 90
+	areaGradient.Parent = self.area
 
 	self.tracksList = Instance.new("ScrollingFrame")
 	self.tracksList.Name = "TracksList"
@@ -450,6 +494,30 @@ function module:buildTimelinePanel()
 
 	self:buildRuler()
 	self:buildPlayhead()
+end
+
+function module:addTrackGrid(container)
+	local maxTime = getMaxTime()
+	for i = 0, maxTime do
+		local line = Instance.new("Frame")
+		line.Size = UDim2.new(0, 1, 1, 0)
+		line.Position = UDim2.new(i / maxTime, 0, 0, 0)
+		line.BackgroundColor3 = Theme.TimelineGrid or Theme.Border
+		line.BackgroundTransparency = i == 0 and 0.42 or 0.72
+		line.BorderSizePixel = 0
+		line.Parent = container
+		line.ZIndex = 13
+		if i < maxTime then
+			local subline = Instance.new("Frame")
+			subline.Size = UDim2.new(0, 1, 1, 0)
+			subline.Position = UDim2.new((i + 0.5) / maxTime, 0, 0, 0)
+			subline.BackgroundColor3 = Theme.TimelineMinorGrid or Theme.Border
+			subline.BackgroundTransparency = 0.86
+			subline.BorderSizePixel = 0
+			subline.Parent = container
+			subline.ZIndex = 13
+		end
+	end
 end
 
 function module:buildRuler()
@@ -556,7 +624,8 @@ function module:ensureTrack(cameraName)
 	local row = Instance.new("Frame")
 	row.Name = "Track_" .. cameraName
 	row.Size = UDim2.new(1, -8, 0, 36)
-	row.BackgroundColor3 = Theme.Panel
+	row.BackgroundColor3 = Theme.Track or Theme.Panel
+	row.BackgroundTransparency = 0.04
 	row.BorderSizePixel = 0
 	row.Active = true
 	row.LayoutOrder = #self.tracks + 1
@@ -573,16 +642,52 @@ function module:ensureTrack(cameraName)
 	grad.Rotation = 90
 	grad.Parent = row
 
+	local selectionRail = Instance.new("Frame")
+	selectionRail.Size = UDim2.new(0, 3, 1, 0)
+	selectionRail.Position = UDim2.new(0, 0, 0, 0)
+	selectionRail.BackgroundColor3 = Theme.Accent
+	selectionRail.BackgroundTransparency = 1
+	selectionRail.BorderSizePixel = 0
+	selectionRail.Parent = row
+	selectionRail.ZIndex = 14
+
+	local cameraDot = Instance.new("Frame")
+	cameraDot.Size = UDim2.new(0, 7, 0, 7)
+	cameraDot.Position = UDim2.new(0, 11, 0.5, -4)
+	cameraDot.BackgroundColor3 = Theme.Accent
+	cameraDot.BorderSizePixel = 0
+	cameraDot.Parent = row
+	cameraDot.ZIndex = 14
+	UIFactory.corner(cameraDot, 4)
+
 	local label = UIFactory.label({
 		Parent = row,
-		Position = UDim2.new(0, 10, 0, 0),
-		Size = UDim2.new(0, 90, 1, 0),
-		Text = cameraName,
+		Position = UDim2.new(0, 24, 0, 4),
+		Size = UDim2.new(0, 68, 0, 15),
+		Text = string.upper(cameraName),
 		Font = Enum.Font.GothamBold,
-		TextSize = 11,
+		TextSize = 10,
 		Color = Theme.TextDim,
-		ZIndex = 13,
+		ZIndex = 14,
 	})
+	UIFactory.label({
+		Parent = row,
+		Position = UDim2.new(0, 24, 0, 19),
+		Size = UDim2.new(0, 68, 0, 11),
+		Text = "CAMERA",
+		Font = Enum.Font.GothamMedium,
+		TextSize = 7,
+		Color = Theme.TextMuted,
+		ZIndex = 14,
+	})
+	local divider = Instance.new("Frame")
+	divider.Size = UDim2.new(0, 1, 1, -10)
+	divider.Position = UDim2.new(0, KF_LABEL_OFFSET - 8, 0, 5)
+	divider.BackgroundColor3 = Theme.Border
+	divider.BackgroundTransparency = 0.45
+	divider.BorderSizePixel = 0
+	divider.Parent = row
+	divider.ZIndex = 13
 
 	local kfContainer = Instance.new("Frame")
 	kfContainer.Name = "Keyframes"
@@ -592,10 +697,13 @@ function module:ensureTrack(cameraName)
 	kfContainer.ClipsDescendants = true
 	kfContainer.Parent = row
 	kfContainer.ZIndex = 13
+	self:addTrackGrid(kfContainer)
 
 	local track = {
 		row = row,
 		label = label,
+		selectionRail = selectionRail,
+		cameraDot = cameraDot,
 		keyframesContainer = kfContainer,
 		keyframes = {},
 		activeKeyframe = nil,
@@ -617,8 +725,11 @@ function module:setActiveCamera(cameraName)
 	for name, tr in pairs(self.tracks) do
 		local highlight = (name == cameraName)
 		tr.row.BackgroundColor3 = highlight
-			and Theme.Accent:Lerp(Theme.Panel, 0.25)
-			or Theme.Panel
+			and (Theme.TrackActive or Theme.Accent:Lerp(Theme.Panel, 0.25))
+			or (Theme.Track or Theme.Panel)
+		tr.selectionRail.BackgroundTransparency = highlight and 0 or 1
+		tr.cameraDot.BackgroundColor3 = highlight and Theme.Keyframe or Theme.Accent
+		tr.label.TextColor3 = highlight and Theme.Text or Theme.TextDim
 	end
 end
 
@@ -627,6 +738,7 @@ function module:renderKeyframes(keyframeTimes)
 		for _, kf in ipairs(tr.keyframes) do
 			if kf.diamond and kf.diamond.Parent then kf.diamond:Destroy() end
 			if kf.guide and kf.guide.Parent then kf.guide:Destroy() end
+			if kf.tooltip and kf.tooltip.Parent then kf.tooltip:Destroy() end
 		end
 		tr.keyframes = {}
 	end
@@ -646,8 +758,8 @@ function module:createKeyframeVisual(cameraName, time)
 	local guide = Instance.new("Frame")
 	guide.Size = UDim2.new(0, 1, 1, 8)
 	guide.Position = UDim2.new(xPos, 0, 0, -4)
-	guide.BackgroundColor3 = Theme.Accent or Theme.Playhead
-	guide.BackgroundTransparency = 0.85
+	guide.BackgroundColor3 = Theme.Keyframe
+	guide.BackgroundTransparency = 0.68
 	guide.BorderSizePixel = 0
 	guide.Parent = track.keyframesContainer
 	guide.ZIndex = 13
@@ -666,15 +778,32 @@ function module:createKeyframeVisual(cameraName, time)
 	diamond.ZIndex = 14
 
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = Theme.Panel
-	stroke.Thickness = 1.5
+	stroke.Color = Theme.Keyframe:Lerp(Theme.Text, 0.42)
+	stroke.Thickness = 1
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	stroke.Parent = diamond
+
+	local tooltip = UIFactory.label({
+		Parent = track.keyframesContainer,
+		Position = UDim2.new(xPos, -24, 0, -17),
+		Size = UDim2.new(0, 48, 0, 12),
+		Text = string.format("%.2fs", time or 0),
+		Font = Enum.Font.GothamMedium,
+		TextSize = 8,
+		Color = Theme.Text,
+		XAlign = Enum.TextXAlignment.Center,
+		ZIndex = 16,
+	})
+	tooltip.BackgroundColor3 = Theme.Header
+	tooltip.BackgroundTransparency = 0.08
+	tooltip.Visible = false
+	UIFactory.corner(tooltip, 3)
 
 	local record = {
 		time = time,
 		diamond = diamond,
 		guide = guide,
+		tooltip = tooltip,
 		expanded = false,
 	}
 	track.keyframes[#track.keyframes + 1] = record
@@ -688,6 +817,7 @@ function module:createKeyframeVisual(cameraName, time)
 	local hoverSize = UDim2.new(0, 16, 0, 16)
 	diamond.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			tooltip.Visible = true
 			TweenService:Create(diamond, TweenInfo.new(0.15), {
 				Size = hoverSize,
 				Position = UDim2.new(xPos, -8, 0.5, -8),
@@ -696,6 +826,7 @@ function module:createKeyframeVisual(cameraName, time)
 	end)
 	diamond.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			tooltip.Visible = false
 			TweenService:Create(diamond, TweenInfo.new(0.15), {
 				Size = record.expanded and UDim2.new(0, 18, 0, 18) or defaultSize,
 				Position = UDim2.new(
@@ -718,6 +849,7 @@ function module:removeKeyframeVisual(cameraName, time)
 		if math.abs(kf.time - time) < 1e-4 then
 			if kf.diamond and kf.diamond.Parent then kf.diamond:Destroy() end
 			if kf.guide and kf.guide.Parent then kf.guide:Destroy() end
+			if kf.tooltip and kf.tooltip.Parent then kf.tooltip:Destroy() end
 			table.remove(track.keyframes, i)
 			return true
 		end
