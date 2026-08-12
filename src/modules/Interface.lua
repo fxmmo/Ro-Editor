@@ -128,136 +128,247 @@ function module:buildTopBar()
 
 	self:buildCamerasModal()
 	self:buildTimelinePanel()
-	self:buildPropertiesPanel()
 
 	return bar
 end
 
-function module:buildPropertiesPanel()
+function module:buildCamerasModal()
+	local backdrop = UIFactory.frame({
+		Parent = self.gui,
+		Size = UDim2.new(1, 0, 1, 0),
+		Position = UDim2.new(0, 0, 0, 0),
+		Color = Color3.new(0, 0, 0),
+		Name = "CamerasModalBackdrop",
+		ZIndex = 50,
+	})
+	backdrop.BackgroundTransparency = 1
+	backdrop.Visible = false
 	local panel = UIFactory.frame({
 		Parent = self.gui,
-		Size = UDim2.new(0, 244, 0, 246),
-		Position = UDim2.new(1, -256, 1, -418),
-		Color = Theme.PanelDark,
-		Corner = 7,
-		Name = "KeyframeProperties",
-		ZIndex = 20,
+		Size = UDim2.new(0, 320, 0, 400),
+		Color = Theme.Panel,
+		Corner = 6,
+		Name = "CamerasModal",
+		ZIndex = 51,
 	})
-	UIFactory.stroke(panel, Theme.Border, 1, 0.15)
-	UIFactory.shadow(panel, 0.16)
-	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new{
-		ColorSequenceKeypoint.new(0, Theme.Panel),
-		ColorSequenceKeypoint.new(1, Theme.TimelineSurface or Theme.PanelDark),
-	}
-	gradient.Rotation = 90
-	gradient.Parent = panel
-	panel.Visible = false
-	self.propertiesPanel = panel
-
+	UIFactory.stroke(panel, Theme.Border, 1)
+	UIFactory.shadow(panel, 0.18)
 	local header = UIFactory.frame({
 		Parent = panel,
-		Size = UDim2.new(1, 0, 0, 42),
+		Size = UDim2.new(1, 0, 0, 32),
 		Position = UDim2.new(0, 0, 0, 0),
 		Color = Theme.Header,
-		Corner = 7,
-		ZIndex = 21,
+		Corner = 6,
+		ZIndex = 52,
 	})
-	local headerLine = Instance.new("Frame")
-	headerLine.Size = UDim2.new(1, 0, 0, 2)
-	headerLine.BackgroundColor3 = Theme.Accent
-	headerLine.BorderSizePixel = 0
-	headerLine.Parent = header
-	headerLine.ZIndex = 22
+	UIFactory.stroke(header, Theme.Border, 1)
+	local headerAccent = Instance.new("Frame")
+	headerAccent.Size = UDim2.new(1, 0, 0, 2)
+	headerAccent.BackgroundColor3 = Theme.Accent
+	headerAccent.BorderSizePixel = 0
+	headerAccent.Parent = header
+	headerAccent.ZIndex = 53
 	UIFactory.label({
 		Parent = header,
-		Position = UDim2.new(0, 13, 0, 7),
-		Size = UDim2.new(1, -26, 0, 15),
-		Text = "KEYFRAME PROPERTIES",
+		Position = UDim2.new(0, 12, 0, 0),
+		Size = UDim2.new(0, 180, 1, 0),
+		Text = "Cameras",
 		Font = Enum.Font.GothamBold,
-		TextSize = 11,
+		TextSize = 12,
 		Color = Theme.Text,
-		ZIndex = 22,
+		ZIndex = 53,
 	})
+	local closeBtn = Instance.new("TextButton")
+	closeBtn.Name = "Close"
+	closeBtn.Size = UDim2.new(0, 22, 0, 22)
+	closeBtn.Position = UDim2.new(1, -28, 0.5, -11)
+	closeBtn.BackgroundColor3 = Theme.Panel
+	closeBtn.BorderSizePixel = 0
+	closeBtn.Font = Enum.Font.GothamBold
+	closeBtn.TextSize = 13
+	closeBtn.TextColor3 = Theme.TextDim
+	closeBtn.Text = "×"
+	closeBtn.AutoButtonColor = false
+	closeBtn.Parent = header
+	closeBtn.ZIndex = 53
+	UIFactory.corner(closeBtn, 3)
+	UIFactory.stroke(closeBtn, Theme.Border, 1)
+	local switchRow = Instance.new("TextButton")
+	switchRow.Name = "ViewRow"
+	switchRow.Size = UDim2.new(1, -24, 0, 30)
+	switchRow.Position = UDim2.new(0, 12, 0, 44)
+	switchRow.BackgroundColor3 = Theme.Header
+	switchRow.BorderSizePixel = 0
+	switchRow.Text = ""
+	switchRow.AutoButtonColor = false
+	switchRow.Parent = panel
+	switchRow.ZIndex = 52
+	UIFactory.corner(switchRow, 4)
+	UIFactory.stroke(switchRow, Theme.Border, 1)
+	UIFactory.label({
+		Parent = switchRow,
+		Position = UDim2.new(0, 10, 0, 0),
+		Size = UDim2.new(1, -60, 1, 0),
+		Text = "View Camera",
+		Font = Enum.Font.GothamBold,
+		TextSize = 12,
+		Color = Theme.Text,
+		ZIndex = 53,
+	})
+	local switchTrack = Instance.new("Frame")
+	switchTrack.Name = "Track"
+	switchTrack.Size = UDim2.new(0, 36, 0, 18)
+	switchTrack.Position = UDim2.new(1, -46, 0.5, -9)
+	switchTrack.BackgroundColor3 = Theme.PanelDark
+	switchTrack.BorderSizePixel = 0
+	switchTrack.Parent = switchRow
+	switchTrack.ZIndex = 53
+	UIFactory.corner(switchTrack, 9)
+	UIFactory.stroke(switchTrack, Theme.Border, 1)
+	local knob = Instance.new("Frame")
+	knob.Name = "Knob"
+	knob.Size = UDim2.new(0, 14, 0, 14)
+	knob.Position = UDim2.new(0, 2, 0.5, -7)
+	knob.BackgroundColor3 = Theme.TextDim
+	knob.BorderSizePixel = 0
+	knob.Parent = switchTrack
+	knob.ZIndex = 54
+	UIFactory.corner(knob, 7)
+	self.viewToggle = {
+		row = switchRow,
+		track = switchTrack,
+		knob = knob,
+		on = false,
+		callback = nil,
+		button = switchRow,
+	}
+	local function rowBtn(name, text, color, yOffset)
+		local b = Instance.new("TextButton")
+		b.Name = name
+		b.Size = UDim2.new(0, 140, 0, 30)
+		b.Position = UDim2.new(0, 12 + (name == "EditCamera" and 152 or 0), 0, yOffset)
+		b.BackgroundColor3 = color or Theme.Header
+		b.BorderSizePixel = 0
+		b.Font = Enum.Font.GothamBold
+		b.TextSize = 11
+		b.TextColor3 = Theme.Text
+		b.Text = text
+		b.AutoButtonColor = false
+		b.Parent = panel
+		b.ZIndex = 52
+		UIFactory.corner(b, 4)
+		UIFactory.stroke(b, Theme.Border, 1)
+		local def = b.BackgroundColor3
+		local hov = def:Lerp(Color3.new(1, 1, 1), 0.12)
+		local prs = def:Lerp(Color3.new(0, 0, 0), 0.08)
+		b.MouseEnter:Connect(function()
+			TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = hov}):Play()
+		end)
+		b.MouseLeave:Connect(function()
+			TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = def}):Play()
+		end)
+		b.MouseButton1Down:Connect(function()
+			TweenService:Create(b, TweenInfo.new(0.08), {BackgroundColor3 = prs}):Play()
+		end)
+		b.MouseButton1Up:Connect(function()
+			TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = hov}):Play()
+		end)
+		return b
+	end
+	self.addCamButton = rowBtn("AddCamera", "Add Camera", Theme.Accent, 86)
+	self.editButton = rowBtn("EditCamera", "Edit Camera", Theme.Panel, 86)
+	local separator = Instance.new("Frame")
+	separator.Size = UDim2.new(1, -24, 0, 1)
+	separator.Position = UDim2.new(0, 12, 0, 130)
+	separator.BackgroundColor3 = Theme.Border
+	separator.BorderSizePixel = 0
+	separator.Parent = panel
+	separator.ZIndex = 52
 	self.propertiesInfo = UIFactory.label({
-		Parent = header,
-		Position = UDim2.new(0, 13, 0, 22),
-		Size = UDim2.new(1, -26, 0, 12),
-		Text = "SELECT A KEYFRAME",
-		Font = Enum.Font.GothamMedium,
-		TextSize = 8,
+		Parent = panel,
+		Position = UDim2.new(0, 12, 0, 141),
+		Size = UDim2.new(1, -24, 0, 16),
+		Text = "SELECT A KEYFRAME TO EDIT PROPERTIES",
+		Font = Enum.Font.GothamBold,
+		TextSize = 9,
 		Color = Theme.TextMuted,
-		ZIndex = 22,
+		ZIndex = 52,
 	})
-
-	local function addSection(title, top)
+	local properties = Instance.new("Frame")
+	properties.Name = "KeyframeProperties"
+	properties.Size = UDim2.new(1, -24, 0, 220)
+	properties.Position = UDim2.new(0, 12, 0, 165)
+	properties.BackgroundTransparency = 1
+	properties.BorderSizePixel = 0
+	properties.Parent = panel
+	properties.ZIndex = 52
+	properties.Visible = false
+	self.propertiesSection = properties
+	self.propertyFields = {}
+	local function sectionTitle(text, y)
 		UIFactory.label({
-			Parent = panel,
-			Position = UDim2.new(0, 13, 0, top),
-			Size = UDim2.new(1, -26, 0, 13),
-			Text = title,
+			Parent = properties,
+			Position = UDim2.new(0, 0, 0, y),
+			Size = UDim2.new(0, 100, 0, 14),
+			Text = text,
 			Font = Enum.Font.GothamBold,
 			TextSize = 9,
 			Color = Theme.TextDim,
-			ZIndex = 22,
+			ZIndex = 53,
 		})
 	end
-
-	local function addField(key, labelText, top, accent)
+	local function addField(key, label, x, y, color)
 		UIFactory.label({
-			Parent = panel,
-			Position = UDim2.new(0, 14, 0, top),
-			Size = UDim2.new(0, 17, 0, 22),
-			Text = labelText,
+			Parent = properties,
+			Position = UDim2.new(0, x, 0, y),
+			Size = UDim2.new(0, 14, 0, 22),
+			Text = label,
 			Font = Enum.Font.GothamBold,
 			TextSize = 10,
-			Color = accent,
-			ZIndex = 22,
+			Color = color,
+			ZIndex = 53,
 		})
-		local box = Instance.new("TextBox")
-		box.Name = key
-		box.Size = UDim2.new(0, 88, 0, 22)
-		box.Position = UDim2.new(0, 32, 0, top)
-		box.BackgroundColor3 = Theme.Background
-		box.BorderSizePixel = 0
-		box.ClearTextOnFocus = false
-		box.PlaceholderText = "0.000"
-		box.PlaceholderColor3 = Theme.TextMuted
-		box.Text = ""
-		box.Font = Enum.Font.Code
-		box.TextSize = 10
-		box.TextColor3 = Theme.Text
-		box.TextXAlignment = Enum.TextXAlignment.Right
-		box.Parent = panel
-		box.ZIndex = 22
-		UIFactory.corner(box, 4)
-		UIFactory.stroke(box, Theme.Border, 1, 0.25)
-		self.propertyFields[key] = box
-		box.FocusLost:Connect(function()
+		local field = Instance.new("TextBox")
+		field.Name = key
+		field.Size = UDim2.new(0, 76, 0, 22)
+		field.Position = UDim2.new(0, x + 16, 0, y)
+		field.BackgroundColor3 = Theme.Background
+		field.BorderSizePixel = 0
+		field.ClearTextOnFocus = false
+		field.PlaceholderText = "0.000"
+		field.PlaceholderColor3 = Theme.TextMuted
+		field.Font = Enum.Font.Code
+		field.TextSize = 10
+		field.TextColor3 = Theme.Text
+		field.TextXAlignment = Enum.TextXAlignment.Right
+		field.Parent = properties
+		field.ZIndex = 53
+		UIFactory.corner(field, 4)
+		UIFactory.stroke(field, Theme.Border, 1, 0.25)
+		self.propertyFields[key] = field
+		field.FocusLost:Connect(function()
 			if self.onPropertiesSubmitted then
 				self.onPropertiesSubmitted(self:getPropertyValues())
 			end
 		end)
 	end
-
-	addSection("POSITION", 50)
-	addField("positionX", "X", 65, Theme.AxisX)
-	addField("positionY", "Y", 91, Theme.AxisY)
-	addField("positionZ", "Z", 117, Theme.AxisZ)
-	addSection("ROTATION", 146)
-	addField("rotationX", "X", 161, Theme.AxisX)
-	addField("rotationY", "Y", 187, Theme.AxisY)
-	addField("rotationZ", "Z", 213, Theme.AxisZ)
-
+	sectionTitle("POSITION", 0)
+	addField("positionX", "X", 0, 18, Theme.AxisX)
+	addField("positionY", "Y", 100, 18, Theme.AxisY)
+	addField("positionZ", "Z", 200, 18, Theme.AxisZ)
+	sectionTitle("ROTATION", 52)
+	addField("rotationX", "X", 0, 70, Theme.AxisX)
+	addField("rotationY", "Y", 100, 70, Theme.AxisY)
+	addField("rotationZ", "Z", 200, 70, Theme.AxisZ)
 	local apply = UIFactory.button({
-		Parent = panel,
-		Position = UDim2.new(0, 132, 0, 187),
-		Size = UDim2.new(0, 99, 0, 22),
+		Parent = properties,
+		Position = UDim2.new(0, 0, 0, 112),
+		Size = UDim2.new(0, 142, 0, 28),
 		Text = "APPLY",
 		Color = Theme.Accent,
 		Corner = 4,
-		TextSize = 9,
-		ZIndex = 22,
+		TextSize = 10,
+		ZIndex = 53,
 	})
 	apply.MouseButton1Click:Connect(function()
 		if self.onPropertiesSubmitted then
@@ -265,27 +376,42 @@ function module:buildPropertiesPanel()
 		end
 	end)
 	local reset = UIFactory.button({
-		Parent = panel,
-		Position = UDim2.new(0, 132, 0, 213),
-		Size = UDim2.new(0, 99, 0, 22),
+		Parent = properties,
+		Position = UDim2.new(0, 154, 0, 112),
+		Size = UDim2.new(0, 142, 0, 28),
 		Text = "RESET",
-		Color = Theme.Panel,
+		Color = Theme.PanelDark,
 		Corner = 4,
-		TextSize = 9,
-		ZIndex = 22,
+		TextSize = 10,
+		ZIndex = 53,
 	})
 	reset.MouseButton1Click:Connect(function()
 		if self.propertyKeyframe then
 			self:setKeyframeProperties(self.propertyKeyframe)
 		end
 	end)
+	self.modalPanel = panel
+	self.modalBackdrop = backdrop
+	panel.Visible = false
+	self.modalOpen = false
+	self.camerasButton.MouseButton1Click:Connect(function()
+		self:openCamerasModal()
+	end)
+	closeBtn.MouseButton1Click:Connect(function()
+		self:closeCamerasModal()
+	end)
+	backdrop.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			self:closeCamerasModal()
+		end
+	end)
 end
 
 function module:getPropertyValues()
-	if not self.propertyKeyframe then return nil end
+	if not self.propertyKeyframe or not self.propertyFields then return nil end
 	local values = {}
-	for key, box in pairs(self.propertyFields) do
-		local value = tonumber(box.Text)
+	for key, field in pairs(self.propertyFields) do
+		local value = tonumber(field.Text)
 		if not value then return nil end
 		values[key] = value
 	end
@@ -303,10 +429,11 @@ function module:setKeyframeProperties(data)
 		local rx, ry, rz = data.cframe:ToOrientation()
 		orientation = Vector3.new(math.deg(rx), math.deg(ry), math.deg(rz))
 	end
-	if not position or not orientation then return end
+	if not position or not orientation or not self.propertyFields then return end
 	self.propertyKeyframe = data
-	self.propertiesPanel.Visible = true
 	self.propertiesInfo.Text = string.format("%s  •  %.2fs", string.upper(data.cameraName or "CAMERA"), data.time or 0)
+	self.propertiesInfo.TextColor3 = Theme.TextDim
+	self.propertiesSection.Visible = true
 	local values = {
 		positionX = position.X,
 		positionY = position.Y,
@@ -316,184 +443,22 @@ function module:setKeyframeProperties(data)
 		rotationZ = orientation.Z,
 	}
 	for key, value in pairs(values) do
-		local box = self.propertyFields[key]
-		if box and not box:IsFocused() then
-			box.Text = string.format("%.3f", value)
+		local field = self.propertyFields[key]
+		if field and not field:IsFocused() then
+			field.Text = string.format("%.3f", value)
 		end
 	end
 end
 
 function module:clearKeyframeProperties()
 	self.propertyKeyframe = nil
-	if self.propertiesPanel then
-		self.propertiesPanel.Visible = false
+	if self.propertiesInfo then
+		self.propertiesInfo.Text = "SELECT A KEYFRAME TO EDIT PROPERTIES"
+		self.propertiesInfo.TextColor3 = Theme.TextMuted
 	end
-end
-
-function module:buildCamerasModal()
-	local backdrop = UIFactory.frame({
-		Parent = self.gui,
-		Size = UDim2.new(1, 0, 1, 0),
-		Position = UDim2.new(0, 0, 0, 0),
-		Color = Color3.new(0, 0, 0),
-		Name = "CamerasModalBackdrop",
-		ZIndex = 50,
-	})
-	backdrop.BackgroundTransparency = 1
-	backdrop.Visible = false
-
-	local panel = UIFactory.frame({
-		Parent = self.gui,
-		Size = UDim2.new(0, 240, 0, 200),
-		Color = Theme.Panel,
-		Corner = 6,
-		Name = "CamerasModal",
-		ZIndex = 51,
-	})
-	UIFactory.stroke(panel, Theme.Border, 1)
-	UIFactory.shadow(panel, 0.18)
-
-	local header = UIFactory.frame({
-		Parent = panel,
-		Size = UDim2.new(1, 0, 0, 32),
-		Position = UDim2.new(0, 0, 0, 0),
-		Color = Theme.Header,
-		Corner = 6,
-		ZIndex = 52,
-	})
-	UIFactory.stroke(header, Theme.Border, 1)
-
-	UIFactory.label({
-		Parent = header,
-		Position = UDim2.new(0, 12, 0, 0),
-		Size = UDim2.new(0, 160, 1, 0),
-		Text = "Cameras",
-		Font = Enum.Font.GothamBold,
-		TextSize = 12,
-		Color = Theme.Text,
-		ZIndex = 53,
-	})
-
-	local closeBtn = Instance.new("TextButton")
-	closeBtn.Name = "Close"
-	closeBtn.Size = UDim2.new(0, 22, 0, 22)
-	closeBtn.Position = UDim2.new(1, -28, 0.5, -11)
-	closeBtn.BackgroundColor3 = Theme.Panel
-	closeBtn.BorderSizePixel = 0
-	closeBtn.Font = Enum.Font.GothamBold
-	closeBtn.TextSize = 13
-	closeBtn.TextColor3 = Theme.TextDim
-	closeBtn.Text = "×"
-	closeBtn.AutoButtonColor = false
-	closeBtn.Parent = header
-	closeBtn.ZIndex = 53
-	UIFactory.corner(closeBtn, 3)
-	UIFactory.stroke(closeBtn, Theme.Border, 1)
-
-	local switchRow = Instance.new("Frame")
-	switchRow.Name = "ViewRow"
-	switchRow.Size = UDim2.new(1, -24, 0, 30)
-	switchRow.Position = UDim2.new(0, 12, 0, 44)
-	switchRow.BackgroundColor3 = Theme.Header
-	switchRow.BorderSizePixel = 0
-	switchRow.Parent = panel
-	switchRow.ZIndex = 52
-	UIFactory.corner(switchRow, 4)
-	UIFactory.stroke(switchRow, Theme.Border, 1)
-
-	UIFactory.label({
-		Parent = switchRow,
-		Position = UDim2.new(0, 10, 0, 0),
-		Size = UDim2.new(1, -60, 1, 0),
-		Text = "View Camera",
-		Font = Enum.Font.GothamBold,
-		TextSize = 12,
-		Color = Theme.Text,
-		ZIndex = 53,
-	})
-
-	local switchTrack = Instance.new("Frame")
-	switchTrack.Name = "Track"
-	switchTrack.Size = UDim2.new(0, 36, 0, 18)
-	switchTrack.Position = UDim2.new(1, -46, 0.5, -9)
-	switchTrack.BackgroundColor3 = Theme.PanelDark
-	switchTrack.BorderSizePixel = 0
-	switchTrack.Parent = switchRow
-	switchTrack.ZIndex = 53
-	UIFactory.corner(switchTrack, 9)
-	UIFactory.stroke(switchTrack, Theme.Border, 1)
-
-	local knob = Instance.new("Frame")
-	knob.Name = "Knob"
-	knob.Size = UDim2.new(0, 14, 0, 14)
-	knob.Position = UDim2.new(0, 2, 0.5, -7)
-	knob.BackgroundColor3 = Theme.TextDim
-	knob.BorderSizePixel = 0
-	knob.Parent = switchTrack
-	knob.ZIndex = 54
-	UIFactory.corner(knob, 7)
-
-	self.viewToggle = {
-		row = switchRow,
-		track = switchTrack,
-		knob = knob,
-		on = false,
-		callback = nil,
-		button = switchRow,
-	}
-
-	local function rowBtn(name, text, color, yOffset)
-		local b = Instance.new("TextButton")
-		b.Name = name
-		b.Size = UDim2.new(1, -24, 0, 30)
-		b.Position = UDim2.new(0, 12, 0, yOffset)
-		b.BackgroundColor3 = color or Theme.Header
-		b.BorderSizePixel = 0
-		b.Font = Enum.Font.GothamBold
-		b.TextSize = 12
-		b.TextColor3 = Theme.Text
-		b.Text = text
-		b.AutoButtonColor = false
-		b.Parent = panel
-		b.ZIndex = 52
-		UIFactory.corner(b, 4)
-		UIFactory.stroke(b, Theme.Border, 1)
-		local def = b.BackgroundColor3
-		local hov = def:Lerp(Color3.new(1,1,1), 0.12)
-		local prs = def:Lerp(Color3.new(0,0,0), 0.08)
-		b.MouseEnter:Connect(function()
-			TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = hov}):Play()
-		end)
-		b.MouseLeave:Connect(function()
-			TweenService:Create(b, TweenInfo.new(0.15), {BackgroundColor3 = def}):Play()
-		end)
-		b.MouseButton1Down:Connect(function()
-			TweenService:Create(b, TweenInfo.new(0.08), {BackgroundColor3 = prs}):Play()
-		end)
-		b.MouseButton1Up:Connect(function()
-			TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = hov}):Play()
-		end)
-		return b
+	if self.propertiesSection then
+		self.propertiesSection.Visible = false
 	end
-
-	self.modalPanel    = panel
-	self.modalBackdrop = backdrop
-	self.addCamButton  = rowBtn("AddCamera",  "Add Camera",  Theme.Accent, 90)
-	self.editButton    = rowBtn("EditCamera", "Edit Camera", Theme.Panel,  132)
-
-	panel.Visible = false
-	self.modalOpen = false
-
-	self.camerasButton.MouseButton1Click:Connect(function()
-		self:openCamerasModal()
-	end)
-	closeBtn.MouseButton1Click:Connect(function() self:closeCamerasModal() end)
-	backdrop.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1
-			or input.UserInputType == Enum.UserInputType.Touch then
-			self:closeCamerasModal()
-		end
-	end)
 end
 
 function module:setViewToggle(on, callback)
@@ -546,15 +511,15 @@ function module:repositionModal()
 	local btnSize = btn.AbsoluteSize
 	local panel = self.modalPanel
 
-	panel.Size = UDim2.new(0, 240, 0, 200)
+	panel.Size = UDim2.new(0, 320, 0, 400)
 
-	local desiredX = btnAbs.X + btnSize.X - 240
+	local desiredX = btnAbs.X + btnSize.X - 320
 	local desiredY = btnAbs.Y + btnSize.Y + 6
 
 	local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize
 		or Vector2.new(panel.Parent.AbsoluteSize.X, panel.Parent.AbsoluteSize.Y)
-	desiredX = math.clamp(desiredX, 8, math.max(8, viewport.X - 248))
-	desiredY = math.clamp(desiredY, 8, math.max(8, viewport.Y - 208))
+	desiredX = math.clamp(desiredX, 8, math.max(8, viewport.X - 328))
+	desiredY = math.clamp(desiredY, 8, math.max(8, viewport.Y - 408))
 
 	self._modalTargetPos = UDim2.new(0, desiredX, 0, desiredY)
 	panel.Position = self._modalTargetPos
