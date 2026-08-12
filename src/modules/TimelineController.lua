@@ -61,6 +61,13 @@ function module.new(interface, store, handles)
 	self:setupButtons()
 	self:setupTimelineInput()
 	self:setupModeButtons()
+	self.connections.CharacterAdded = Players.LocalPlayer.CharacterAdded:Connect(function()
+		if not self.cameraMode then
+			task.defer(function()
+				self:_restorePlayerCamera()
+			end)
+		end
+	end)
 	self:startLoop()
 	return self
 end
@@ -157,27 +164,57 @@ function module:toggleEditMode()
 	self.handles:show(self.editMode)
 end
 
-function module:_applyCameraMode()
-	if self.cameraMode then
-		local entry = self:activeCam()
-		if not entry or not entry.camera then
-			self.cameraMode = false
-			self.ui:setViewToggle(false)
-			return self:_applyCameraMode()
+function module:_isEditorCamera(camera)
+	if not camera then return false end
+	for _, entry in pairs(CameraResolver.getAll()) do
+		if entry.camera == camera then
+			return true
 		end
-		if workspace.CurrentCamera ~= entry.camera then
-			self.playerCamera = workspace.CurrentCamera
-		end
-		entry.camera.CameraType = Enum.CameraType.Scriptable
-		workspace.CurrentCamera = entry.camera
-		return
 	end
-	if not self.playerCamera or not self.playerCamera.Parent then return end
-	workspace.CurrentCamera = self.playerCamera
-	self.playerCamera.CameraType = Enum.CameraType.Custom
+	return false
+end
+function module:_rememberPlayerCamera()
+	local current = workspace.CurrentCamera
+	if current and not self:_isEditorCamera(current) then
+		self.playerCamera = current
+	end
+end
+function module:_restorePlayerCamera()
+	self:_rememberPlayerCamera()
+	local camera = self.playerCamera
+	if not camera or not camera.Parent or self:_isEditorCamera(camera) then
+		camera = Instance.new("Camera")
+		camera.Name = "PlayerCamera"
+		camera.Parent = workspace
+		self.playerCamera = camera
+	end
+	workspace.CurrentCamera = camera
+	camera.CameraType = Enum.CameraType.Custom
 	local character = Players.LocalPlayer.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	self.playerCamera.CameraSubject = humanoid or character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	camera.CameraSubject = humanoid or root or character
+	self.previewCamera = nil
+end
+function module:_applyCameraMode()
+	if not self.cameraMode then
+		self:_restorePlayerCamera()
+		return
+	end
+	local entry = self:activeCam()
+	if not entry or not entry.camera then
+		self.cameraMode = false
+		self.ui:setViewToggle(false)
+		self:_restorePlayerCamera()
+		return
+	end
+	local current = workspace.CurrentCamera
+	if current and current ~= entry.camera and not self:_isEditorCamera(current) then
+		self.playerCamera = current
+	end
+	entry.camera.CameraType = Enum.CameraType.Scriptable
+	workspace.CurrentCamera = entry.camera
+	self.previewCamera = entry.camera
 end
 
 function module:_refreshTimelineHeight()
@@ -438,6 +475,10 @@ function module:startLoop()
 end
 
 function module:destroy()
+	if self.cameraMode then
+		self.cameraMode = false
+		self:_restorePlayerCamera()
+	end
 	if self.tweenConnection then
 		self.tweenConnection:Disconnect()
 		self.tweenConnection = nil
