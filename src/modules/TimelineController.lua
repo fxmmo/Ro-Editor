@@ -62,12 +62,25 @@ function module.new(interface, store, handles)
 	self:setupButtons()
 	self:setupTimelineInput()
 	self:setupModeButtons()
-	self.connections.CharacterAdded = Players.LocalPlayer.CharacterAdded:Connect(function()
-		if not self.cameraMode then
-			task.defer(function()
+	self.connections.CharacterAdded = Players.LocalPlayer.CharacterAdded:Connect(function(character)
+		task.defer(function()
+			Players.LocalPlayer:WaitForChild("PlayerGui", 5)
+			if character and character.Parent then
+				character:WaitForChild("Humanoid", 5)
+			end
+			if not self.cameraMode then
 				self:_restorePlayerCamera()
-			end)
-		end
+			end
+			self.ui:setEditTool(self.editTool)
+			local entry = self:activeCam()
+			if self.editMode and entry then
+				self.handles:setMode(self.editTool)
+				self.handles:setTarget(entry.part)
+				self.handles:show(true)
+			else
+				self.handles:show(false)
+			end
+		end)
 	end)
 	self:startLoop()
 	return self

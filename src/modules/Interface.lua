@@ -35,23 +35,10 @@ local function getMaxTime()
 	return Config.MaxTime or 10
 end
 
-local function getTimelineAxis(areaWidth)
-	local width = math.max(areaWidth - TIMELINE_AXIS_LEFT - TIMELINE_AXIS_RIGHT, 1)
-	return TIMELINE_AXIS_LEFT, width
-end
-
-local function xToTime(absX, areaAbsX, areaWidth)
-	local maxTime = getMaxTime()
-	local left, width = getTimelineAxis(areaWidth)
-	local n = math.clamp((absX - areaAbsX - left) / width, 0, 1)
-	return n * maxTime
-end
-
-local function timeToX(t, areaWidth)
-	local maxTime = getMaxTime()
-	local left, width = getTimelineAxis(areaWidth)
-	local clamped = math.clamp(t, 0, maxTime)
-	return left + (clamped / maxTime) * width
+local function fallbackTimelineAxis(areaWidth)
+	local left = TRACK_PADDING + KF_LABEL_OFFSET
+	local width = math.max(areaWidth - left - TIMELINE_AXIS_RIGHT, 1)
+	return left, width
 end
 
 function module.new()
@@ -75,12 +62,49 @@ function module.new()
 	return self
 end
 
+function module:getTimelineAxis()
+	if not self.area then
+		return TIMELINE_AXIS_LEFT, 1
+	end
+	local areaPosition = self.area.AbsolutePosition.X
+	local areaWidth = self.area.AbsoluteSize.X
+	local left, width = fallbackTimelineAxis(areaWidth)
+	for _, track in pairs(self.tracks) do
+		local row = track.row
+		local container = track.keyframesContainer
+		if row and row.Parent and container and container.Parent then
+			left = row.AbsolutePosition.X - areaPosition + container.Position.X.Offset
+			width = container.AbsoluteSize.X
+			break
+		end
+	end
+	return left, math.max(width, 1)
+end
+
 function module:timeToX(t)
-	return timeToX(t, self.area.AbsoluteSize.X)
+	local maxTime = getMaxTime()
+	local left, width = self:getTimelineAxis()
+	local clamped = math.clamp(t, 0, maxTime)
+	return left + (clamped / maxTime) * width
 end
 
 function module:xToTime(absX)
-	return xToTime(absX, self.area.AbsolutePosition.X, self.area.AbsoluteSize.X)
+	local maxTime = getMaxTime()
+	local left, width = self:getTimelineAxis()
+	local n = math.clamp((absX - self.area.AbsolutePosition.X - left) / width, 0, 1)
+	return n * maxTime
+end
+
+function module:refreshTimelineAxis()
+	if not self.area then return end
+	local left, width = self:getTimelineAxis()
+	if self.ruler and self.ruler.Parent then
+		self.ruler.Position = UDim2.new(0, left, 0, 4)
+		self.ruler.Size = UDim2.new(0, width, 0, 22)
+	end
+	if self.playheadLine and self.playheadLine.Parent then
+		self.playheadLine.Position = UDim2.new(0, left - 1, 0, 4)
+	end
 end
 
 function module:buildTopBar()
@@ -707,10 +731,11 @@ function module:buildRuler()
 	if self.ruler and self.ruler.Parent then
 		self.ruler:Destroy()
 	end
+	local left, width = self:getTimelineAxis()
 	local ruler = UIFactory.frame({
 		Parent = self.area,
-		Size = UDim2.new(1, -TIMELINE_AXIS_LEFT - TIMELINE_AXIS_RIGHT, 0, 22),
-		Position = UDim2.new(0, TIMELINE_AXIS_LEFT, 0, 4),
+		Size = UDim2.new(0, width, 0, 22),
+		Position = UDim2.new(0, left, 0, 4),
 		Color = Theme.PanelDark,
 		Name = "Ruler",
 		ZIndex = 30,
@@ -761,7 +786,8 @@ function module:buildPlayhead()
 	self.playheadLine = Instance.new("Frame")
 	self.playheadLine.Name = "PlayheadLine"
 	self.playheadLine.Size = UDim2.new(0, 2, 1, -8)
-	self.playheadLine.Position = UDim2.new(0, TIMELINE_AXIS_LEFT - 1, 0, 4)
+	local left = self:getTimelineAxis()
+	self.playheadLine.Position = UDim2.new(0, left - 1, 0, 4)
 	self.playheadLine.BackgroundColor3 = Theme.Playhead
 	self.playheadLine.BorderSizePixel = 0
 	self.playheadLine.Parent = self.area
@@ -864,6 +890,12 @@ function module:ensureTrack(cameraName)
 		end
 	end)
 	self.tracks[cameraName] = track
+	self:refreshTimelineAxis()
+	task.defer(function()
+		if self.tracks[cameraName] == track then
+			self:refreshTimelineAxis()
+		end
+	end)
 	return track
 end
 
@@ -985,7 +1017,7 @@ function module:updatePlayheadProximity(time, pixelPos)
 	local threshold = 6
 	for _, track in pairs(self.tracks) do
 		for _, kf in ipairs(track.keyframes) do
-			local kfX = timeToX(kf.time, self.area.AbsoluteSize.X)
+			local kfX = self:timeToX(kf.time)
 			local dist = math.abs(pixelPos - kfX)
 			local shouldExpand = dist < threshold
 			if shouldExpand ~= kf.expanded then
@@ -1040,8 +1072,7 @@ end
 function module:setPlayheadPosition(time)
 	local maxTime = getMaxTime()
 	local clampedTime = math.clamp(time, 0, maxTime)
-	local areaWidth = self.area.AbsoluteSize.X
-	local pixelPos = timeToX(clampedTime, areaWidth)
+	local pixelPos = self:timeToX(clampedTime)
 
 	self.playheadLine.Position = UDim2.new(0, pixelPos - 1, 0, 4)
 
