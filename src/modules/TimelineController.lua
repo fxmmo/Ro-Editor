@@ -51,6 +51,9 @@ function module.new(interface, store, handles)
 	self.ui.onKeyframeSelected = function(cameraName, data)
 		self:selectKeyframe(cameraName, data)
 	end
+	self.ui.onPropertiesSubmitted = function(values)
+		self:applySelectedKeyframeProperties(values)
+	end
 	self.handles.onChanged = function()
 		self:updateSelectedKeyframe()
 	end
@@ -119,11 +122,14 @@ function module:addCamera()
 	self:_refreshTimelineHeight()
 end
 
-function module:selectCamera(cameraName)
+function module:selectCamera(cameraName, preserveProperties)
 	local entry = CameraResolver.get(cameraName)
 	if not entry then return end
 	self.lastCam = entry
 	self.ui:setActiveCamera(cameraName)
+	if not preserveProperties then
+		self.ui:clearKeyframeProperties()
+	end
 	if self.editMode then
 		self.handles:setTarget(entry.part)
 		self.handles:show(true)
@@ -239,6 +245,7 @@ function module:addKeyframe()
 	}
 	store:add(data)
 	store:setSelected(data)
+	self.ui:setKeyframeProperties(data)
 
 	local record = self.ui:createKeyframeVisual(camName, time)
 	data.frame = record.diamond
@@ -257,12 +264,38 @@ function module:updateSelectedKeyframe()
 	selected.cframe = entry.part.CFrame
 	selected.position = entry.part.Position
 	selected.orientation = entry.part.Orientation
+	self.ui:setKeyframeProperties(selected)
+end
+
+function module:applySelectedKeyframeProperties(values)
+	if not values then return end
+	local entry = self:activeCam()
+	if not entry or not entry.part or not self.lastCam then return end
+	local store = self:storeFor(self.lastCam.name)
+	local selected = store:getSelected()
+	if not selected then return end
+	local position = Vector3.new(values.positionX, values.positionY, values.positionZ)
+	local orientation = Vector3.new(values.rotationX, values.rotationY, values.rotationZ)
+	local cframe = CFrame.new(position) * CFrame.fromOrientation(
+		math.rad(orientation.X),
+		math.rad(orientation.Y),
+		math.rad(orientation.Z)
+	)
+	CameraResolver.setCFrame(entry, cframe)
+	selected.position = position
+	selected.orientation = orientation
+	selected.cframe = cframe
+	self.ui:setKeyframeProperties(selected)
+	if self.cameraMode then
+		self:_applyCameraMode()
+	end
 end
 
 function module:selectKeyframe(camName, data)
-	self:selectCamera(camName)
+	self:selectCamera(camName, true)
 	local store = self:storeFor(camName)
 	store:setSelected(data)
+	self.ui:setKeyframeProperties(data)
 	self.currentTime = data.time
 	self.isPlaying = false
 	self:updatePlayhead()
