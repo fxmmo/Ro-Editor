@@ -57,6 +57,8 @@ function module.new()
 	self.gui.Parent = playerGui
 	self.modalOpen = false
 	self.editSectionOpen = false
+	self.timelineMinimized = false
+	self.timelineExpandedHeight = 160
 	self.tracks = {}
 	self.activeCameraName = nil
 	return self
@@ -70,10 +72,9 @@ function module:getTimelineAxis()
 	local areaWidth = self.area.AbsoluteSize.X
 	local left, width = fallbackTimelineAxis(areaWidth)
 	for _, track in pairs(self.tracks) do
-		local row = track.row
 		local container = track.keyframesContainer
-		if row and row.Parent and container and container.Parent then
-			left = row.AbsolutePosition.X - areaPosition + container.Position.X.Offset
+		if container and container.Parent then
+			left = container.AbsolutePosition.X - areaPosition
 			width = container.AbsoluteSize.X
 			break
 		end
@@ -310,7 +311,7 @@ function module:buildCamerasModal()
 	self.editButton = rowBtn("EditCamera", "Edit Camera", Theme.Panel, 86)
 	local editSection = Instance.new("Frame")
 	editSection.Name = "EditCameraSection"
-	editSection.Size = UDim2.new(1, -24, 0, 72)
+	editSection.Size = UDim2.new(1, -24, 0, 82)
 	editSection.Position = UDim2.new(0, 12, 0, 138)
 	editSection.BackgroundColor3 = Theme.Header
 	editSection.BorderSizePixel = 0
@@ -329,11 +330,11 @@ function module:buildCamerasModal()
 		ZIndex = 53,
 	})
 	self.editToolButtons = {}
-	local function editToolButton(name, text, x, mode)
+	local function editToolButton(name, text, y, mode)
 		local button = UIFactory.button({
 			Parent = editSection,
-			Position = UDim2.new(0, x, 0, 22),
-			Size = UDim2.new(0, 140, 0, 28),
+			Position = UDim2.new(0, 10, 0, y),
+			Size = UDim2.new(1, -20, 0, 24),
 			Text = text,
 			Color = Theme.Panel,
 			Corner = 4,
@@ -350,8 +351,8 @@ function module:buildCamerasModal()
 		self.editToolButtons[mode] = button
 		return button
 	end
-	editToolButton("MoveCamera", "MOVE CAMERA", 0, "move")
-	editToolButton("RotateCamera", "ROTATE CAMERA", 152, "rotate")
+	editToolButton("MoveCamera", "MOVE CAMERA", 20, "move")
+	editToolButton("RotateCamera", "ROTATE CAMERA", 48, "rotate")
 	self.editSection = editSection
 	editSection.Visible = false
 	local separator = Instance.new("Frame")
@@ -553,7 +554,7 @@ function module:setEditSectionVisible(visible)
 	if not self.editSection or not self.modalPanel then return false end
 	self.editSectionOpen = visible and true or false
 	self.editSection.Visible = self.editSectionOpen
-	local offset = self.editSectionOpen and 79 or 0
+	local offset = self.editSectionOpen and 89 or 0
 	self.propertiesInfo.Position = UDim2.new(0, 12, 0, 141 + offset)
 	self.propertiesSection.Position = UDim2.new(0, 12, 0, 165 + offset)
 	self.modalPanel.Size = UDim2.new(0, 320, 0, 400 + offset)
@@ -617,7 +618,7 @@ function module:repositionModal()
 	local btnSize = btn.AbsoluteSize
 	local panel = self.modalPanel
 
-	local panelHeight = self.editSectionOpen and 479 or 400
+	local panelHeight = self.editSectionOpen and 489 or 400
 	panel.Size = UDim2.new(0, 320, 0, panelHeight)
 
 	local desiredX = btnAbs.X + btnSize.X - 320
@@ -630,6 +631,28 @@ function module:repositionModal()
 
 	self._modalTargetPos = UDim2.new(0, desiredX, 0, desiredY)
 	panel.Position = self._modalTargetPos
+end
+
+function module:setTimelineMinimized(minimized)
+	self.timelineMinimized = minimized and true or false
+	if not self.timelineMinimized and self.timelinePanel and self.timelinePanel.Size.Y.Offset > 34 then
+		self.timelineExpandedHeight = self.timelinePanel.Size.Y.Offset
+	end
+	local panelHeight = self.timelineMinimized and 34 or (self.timelineExpandedHeight or 160)
+	if self.timelinePanel then
+		self.timelinePanel.Size = UDim2.new(1, 0, 0, panelHeight)
+		self.timelinePanel.Position = UDim2.new(0, 0, 1, -panelHeight)
+	end
+	if self.area then
+		self.area.Visible = not self.timelineMinimized
+	end
+	if self.timelineMinimizeButton then
+		self.timelineMinimizeButton.Text = self.timelineMinimized and "+" or "-"
+	end
+	if not self.timelineMinimized then
+		self:refreshTimelineAxis()
+	end
+	return self.timelineMinimized
 end
 
 function module:buildTimelinePanel()
@@ -692,6 +715,21 @@ function module:buildTimelinePanel()
 		XAlign = Enum.TextXAlignment.Right,
 		ZIndex = 12,
 	})
+
+	self.timelineMinimizeButton = UIFactory.button({
+		Parent = header,
+		Name = "MinimizeTimeline",
+		Position = UDim2.new(1, -154, 0.5, -12),
+		Size = UDim2.new(0, 28, 0, 24),
+		Text = "-",
+		Color = Theme.Panel,
+		Corner = 4,
+		TextSize = 16,
+		ZIndex = 13,
+	})
+	self.timelineMinimizeButton.MouseButton1Click:Connect(function()
+		self:setTimelineMinimized(not self.timelineMinimized)
+	end)
 
 	self.area = UIFactory.frame({
 		Parent = panel,
@@ -919,13 +957,15 @@ function module:renderKeyframes(keyframeTimes)
 	end
 
 	for name, _ in pairs(self.tracks) do
-		for _, t in ipairs(keyframeTimes) do
-			self:createKeyframeVisual(name, t)
+		for _, item in ipairs(keyframeTimes) do
+			local time = typeof(item) == "table" and item.time or item
+			local data = typeof(item) == "table" and item or nil
+			self:createKeyframeVisual(name, time, data)
 		end
 	end
 end
 
-function module:createKeyframeVisual(cameraName, time)
+function module:createKeyframeVisual(cameraName, time, data)
 	local track = self:ensureTrack(cameraName)
 	local maxTime = getMaxTime()
 	local xPos = (time or 0) / maxTime
@@ -963,11 +1003,15 @@ function module:createKeyframeVisual(cameraName, time)
 		diamond = diamond,
 		guide = guide,
 		expanded = false,
+		data = data,
 	}
 	track.keyframes[#track.keyframes + 1] = record
 	diamond.MouseButton1Click:Connect(function()
-		if self.onKeyframeSelected and record.data then
-			self.onKeyframeSelected(cameraName, record.data)
+		if self.onKeyframeSelected then
+			self.onKeyframeSelected(cameraName, record.data or {
+				time = record.time,
+				cameraName = cameraName,
+			})
 		end
 	end)
 

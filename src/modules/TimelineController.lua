@@ -43,6 +43,7 @@ function module.new(interface, store, handles)
 	self.cameraMode = false
 	self.lastCam = nil
 	self.playerCamera = workspace.CurrentCamera
+	self.cameraLock = nil
 	self.tweenConnection = nil
 	self.storeByCamera = {}
 	self.connections = {}
@@ -58,6 +59,9 @@ function module.new(interface, store, handles)
 	self.handles.onChanged = function()
 		self:updateSelectedKeyframe()
 	end
+	self.handles.onDragStateChanged = function(dragging)
+		self:_setPlayerCameraLocked(dragging)
+	end
 	self.handles:show(false)
 	self:setupButtons()
 	self:setupTimelineInput()
@@ -67,6 +71,10 @@ function module.new(interface, store, handles)
 			Players.LocalPlayer:WaitForChild("PlayerGui", 5)
 			if character and character.Parent then
 				character:WaitForChild("Humanoid", 5)
+			end
+			self.cameraLock = nil
+			if self.handles.isDragging then
+				self.handles:stopDrag()
 			end
 			if not self.cameraMode then
 				self:_restorePlayerCamera()
@@ -228,6 +236,34 @@ function module:_restorePlayerCamera()
 	camera.CameraSubject = humanoid or root or character
 	self.previewCamera = nil
 end
+function module:_setPlayerCameraLocked(locked)
+	if locked then
+		if self.cameraLock or self.cameraMode or not self.editMode then return end
+		local camera = workspace.CurrentCamera
+		if not camera or self:_isEditorCamera(camera) or not camera.Parent then return end
+		self.cameraLock = {
+			camera = camera,
+			cframe = camera.CFrame,
+			cameraType = camera.CameraType,
+			cameraSubject = camera.CameraSubject,
+		}
+		self.playerCamera = camera
+		camera.CameraType = Enum.CameraType.Scriptable
+		camera.CFrame = self.cameraLock.cframe
+		return
+	end
+	local lock = self.cameraLock
+	self.cameraLock = nil
+	if not lock or not lock.camera or not lock.camera.Parent or self.cameraMode then return end
+	workspace.CurrentCamera = lock.camera
+	lock.camera.CFrame = lock.cframe
+	lock.camera.CameraType = Enum.CameraType.Custom
+	local character = Players.LocalPlayer.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	lock.camera.CameraSubject = humanoid or root or character or lock.cameraSubject
+end
+
 function module:_applyCameraMode()
 	if not self.cameraMode then
 		self:_restorePlayerCamera()
@@ -250,11 +286,13 @@ function module:_applyCameraMode()
 end
 
 function module:_refreshTimelineHeight()
+	if self.ui.timelineMinimized then return end
 	local count = 0
 	for _ in pairs(self.ui.tracks) do count += 1 end
 	local rowH = 36
 	local pad = 4
 	local desired = math.clamp(count * (rowH + pad) + 28, 160, 280)
+	self.ui.timelineExpandedHeight = desired
 	local panel = self.ui.gui:FindFirstChild("TimelinePanel")
 	if panel then
 		panel.Size = UDim2.new(1, 0, 0, desired)
@@ -316,9 +354,8 @@ function module:addKeyframe()
 	store:setSelected(data)
 	self.ui:setKeyframeProperties(data)
 
-	local record = self.ui:createKeyframeVisual(camName, time)
+	local record = self.ui:createKeyframeVisual(camName, time, data)
 	data.frame = record.diamond
-	record.data = data
 
 	self.addBtn.BackgroundColor3 = Theme.Success
 	task.delay(0.2, function() self.addBtn.BackgroundColor3 = Theme.Panel end)
@@ -363,12 +400,22 @@ end
 function module:selectKeyframe(camName, data)
 	self:selectCamera(camName, true)
 	local store = self:storeFor(camName)
-	store:setSelected(data)
-	self.ui:setKeyframeProperties(data)
-	self.currentTime = data.time
+	local selected = data
+	if not selected or not selected.cframe then
+		for _, candidate in ipairs(store.keyframes) do
+			if candidate.time and data and math.abs(candidate.time - data.time) < 1e-4 then
+				selected = candidate
+				break
+			end
+		end
+	end
+	if not selected then return end
+	store:setSelected(selected)
+	self.ui:setKeyframeProperties(selected)
+	self.currentTime = selected.time or 0
 	self.isPlaying = false
 	self:updatePlayhead()
-	self:tweenCameraTo(data.cframe)
+	self:tweenCameraTo(selected.cframe)
 end
 
 function module:tweenCameraTo(targetCFrame)
@@ -507,6 +554,7 @@ function module:startLoop()
 end
 
 function module:destroy()
+	self:_setPlayerCameraLocked(false)
 	if self.cameraMode then
 		self.cameraMode = false
 		self:_restorePlayerCamera()
