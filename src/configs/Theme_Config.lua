@@ -17,9 +17,9 @@ module.Theme = {
 	Keyframe = Color3.fromRGB(255, 200, 50),
 	KeyframeSelected = Color3.fromRGB(0, 162, 255),
 	Playhead = Color3.fromRGB(0, 162, 255),
-	AxisX = Color3.fromRGB(232, 65, 65),
-	AxisY = Color3.fromRGB(120, 220, 90),
-	AxisZ = Color3.fromRGB(70, 140, 240),
+	AxisX = Color3.fromRGB(255, 82, 82),
+	AxisY = Color3.fromRGB(105, 235, 110),
+	AxisZ = Color3.fromRGB(82, 145, 255),
 }
 
 module.Config = {
