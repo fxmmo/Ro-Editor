@@ -20,6 +20,11 @@ module.Theme = {
 	AxisX = Color3.fromRGB(255, 82, 82),
 	AxisY = Color3.fromRGB(105, 235, 110),
 	AxisZ = Color3.fromRGB(82, 145, 255),
+	TimelineSurface = Color3.fromRGB(31, 35, 43),
+	TimelineGrid = Color3.fromRGB(93, 106, 126),
+	TimelineMinorGrid = Color3.fromRGB(63, 73, 88),
+	Track = Color3.fromRGB(39, 45, 56),
+	TrackActive = Color3.fromRGB(24, 75, 108),
 }
 
 module.Config = {
