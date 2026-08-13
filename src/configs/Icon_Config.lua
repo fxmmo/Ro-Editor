@@ -4,6 +4,8 @@ return {
 	Check = "rbxassetid://93898873302694",
 	ChevronDown = "rbxassetid://134243273101015",
 	ChevronUp = "rbxassetid://122444883127455",
+	ChevronLeft = "rbxassetid://102531941843733",
+	ChevronRight = "rbxassetid://113692007244654",
 	Clapperboard = "rbxassetid://132660667070200",
 	Eye = "rbxassetid://100033680381365",
 	Maximize = "rbxassetid://76045941763188",

@@ -109,6 +109,33 @@ function module:addCamera(entry)
 	return self:_createMarker(entry)
 end
 
+function module:renameCamera(oldName, newName, entry)
+	if oldName == newName then return end
+	local markerRecord = self.cameraMarkers[oldName]
+	if markerRecord then
+		self.cameraMarkers[oldName] = nil
+		self.cameraMarkers[newName] = markerRecord
+		markerRecord.entry = entry or markerRecord.entry
+		if markerRecord.marker then
+			markerRecord.marker.Name = newName .. "_Marker"
+		end
+		if markerRecord.billboard then
+			local label = markerRecord.billboard:FindFirstChild("Text")
+			if label then
+				label.Text = newName
+			end
+		end
+	end
+	local path = self.paths[oldName]
+	if path then
+		self.paths[oldName] = nil
+		self.paths[newName] = path
+		if path.folder then
+			path.folder.Name = newName .. "_Path"
+		end
+	end
+end
+
 function module:removeCamera(cameraName)
 	local record = self.cameraMarkers[cameraName]
 	if record and record.marker then

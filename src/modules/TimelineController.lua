@@ -28,6 +28,18 @@ local CameraResolver = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Ed
 local WorldVisuals = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/WorldVisuals.lua") or error("[Ro-Editor] import failed")
 local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua") or error("[Ro-Editor] import failed")
 local _nextCamId = 1
+local EPSILON = 1e-4
+local easingFunctions = {
+	Linear = function(alpha) return alpha end,
+	EaseIn = function(alpha) return alpha * alpha end,
+	EaseOut = function(alpha) return 1 - (1 - alpha) * (1 - alpha) end,
+	EaseInOut = function(alpha)
+		if alpha < 0.5 then
+			return 2 * alpha * alpha
+		end
+		return 1 - ((-2 * alpha + 2) ^ 2) / 2
+	end,
+}
 
 local module = {}
 module.__index = module
@@ -58,6 +70,20 @@ function module.new(interface, store, handles)
 	end
 	self.ui.onPropertiesSubmitted = function(values)
 		self:applySelectedKeyframeProperties(values)
+	end
+	self.ui.onPrevKeyframe = function()
+		self:prevKeyframe()
+	end
+	self.ui.onNextKeyframe = function()
+		self:nextKeyframe()
+	end
+	self.ui.onTrackPropertiesRequested = function(cameraName, absolutePosition)
+		self:selectCamera(cameraName)
+		local store = self:storeFor(cameraName)
+		self.ui:openTrackProperties(cameraName, absolutePosition, store.metadata)
+	end
+	self.ui.onTrackPropertiesSubmitted = function(cameraName, values)
+		self:applyTrackProperties(cameraName, values)
 	end
 	self.handles.onChanged = function()
 		self:updateSelectedKeyframe()
@@ -104,9 +130,92 @@ end
 
 function module:storeFor(cameraName)
 	if not self.storeByCamera[cameraName] then
-		self.storeByCamera[cameraName] = setmetatable({keyframes = {}, selected = nil}, {__index = self.store})
+		self.storeByCamera[cameraName] = setmetatable({
+			keyframes = {},
+			selected = nil,
+			metadata = {
+				speedMultiplier = 1,
+				easing = "EaseInOut",
+			},
+		}, {__index = self.store})
 	end
-	return self.storeByCamera[cameraName]
+	local store = self.storeByCamera[cameraName]
+	store.metadata = store.metadata or {
+		speedMultiplier = 1,
+		easing = "EaseInOut",
+	}
+	return store
+end
+
+function module:applyTrackProperties(cameraName, values)
+	if not cameraName or not values then return end
+	local entry = CameraResolver.get(cameraName)
+	if not entry then return end
+	local store = self:storeFor(cameraName)
+	store.metadata.speedMultiplier = values.speedMultiplier
+	store.metadata.easing = values.easing or store.metadata.easing or "EaseInOut"
+	local newName = values.name
+	if newName ~= cameraName then
+		local renamed = self:renameCamera(cameraName, newName)
+		if not renamed then return end
+		cameraName = newName
+	end
+	self.ui:closeTrackProperties()
+end
+
+function module:renameCamera(oldName, newName)
+	if not oldName or not newName or newName == "" then return nil end
+	if oldName == newName then return CameraResolver.get(oldName) end
+	if CameraResolver.get(newName) then return nil end
+	local entry = CameraResolver.get(oldName)
+	if not entry or not entry.part then return nil end
+	local cframe = entry.part.CFrame
+	local fieldOfView = entry.camera and entry.camera.FieldOfView or 70
+	local parent = entry.part.Parent
+	local wasCameraMode = self.cameraMode
+	if wasCameraMode then
+		self.cameraMode = false
+		self.ui:setViewToggle(false)
+		self:_restorePlayerCamera()
+	end
+	self:_setPlayerCameraLocked(false)
+	if self.tweenConnection then
+		self.tweenConnection:Disconnect()
+		self.tweenConnection = nil
+	end
+	CameraResolver.destroy(oldName)
+	local renamed = CameraResolver.createCam({
+		Name = newName,
+		CFrame = cframe,
+		FieldOfView = fieldOfView,
+		Parent = parent,
+	})
+	if not renamed then return nil end
+	local store = self.storeByCamera[oldName]
+	self.storeByCamera[oldName] = nil
+	if store then
+		self.storeByCamera[newName] = store
+		for _, keyframe in ipairs(store.keyframes) do
+			keyframe.cameraName = newName
+		end
+	end
+	self.visuals:renameCamera(oldName, newName, renamed)
+	self.ui:updateTrackName(oldName, newName)
+	if store and store:getSelected() then
+		self.ui:setKeyframeProperties(store:getSelected())
+	end
+	self.lastCam = renamed
+	if self.editMode then
+		self.handles:setMode(self.editTool)
+		self.handles:setTarget(renamed.part)
+		self.handles:show(true)
+	end
+	if wasCameraMode then
+		self.cameraMode = true
+		self.ui:setViewToggle(true)
+		self:_applyCameraMode()
+	end
+	return renamed
 end
 
 function module:setupModeButtons()
@@ -146,11 +255,17 @@ function module:setupModeButtons()
 end
 
 function module:addCamera()
-	local name = ("cam_" .. _nextCamId)
-	_nextCamId += 1
+	local name
+	repeat
+		name = "cam_" .. _nextCamId
+		_nextCamId += 1
+	until not CameraResolver.get(name)
+	local character = Players.LocalPlayer.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local spawnCFrame = root and (root.CFrame * CFrame.new(0, 1, -5)) or CFrame.new(0, 5, 10)
 	local camData = CameraResolver.createCam({
 		Name = name,
-		CFrame = CFrame.new(0, 5, 10),
+		CFrame = spawnCFrame,
 		FieldOfView = 70,
 	})
 
@@ -355,6 +470,12 @@ function module:setupButtons()
 	self.deleteBtn = self.ui:createControlButton(4, "", Theme.Panel, function()
 		self:deleteKeyframe()
 	end, Icons.Trash)
+	self.prevBtn = self.ui:createControlButton(5, "", Theme.Panel, function()
+		self:prevKeyframe()
+	end, Icons.ChevronLeft)
+	self.nextBtn = self.ui:createControlButton(6, "", Theme.Panel, function()
+		self:nextKeyframe()
+	end, Icons.ChevronRight)
 end
 function module:_updatePlaybackButton()
 	if not self.playBtn then return end
@@ -418,6 +539,7 @@ function module:addKeyframe()
 		orientation = entry.part.Orientation,
 		cframe = entry.part.CFrame,
 		cameraName = camName,
+		easing = (store.metadata and store.metadata.easing) or "EaseInOut",
 	}
 	store:add(data)
 	store:setSelected(data)
@@ -462,10 +584,40 @@ function module:applySelectedKeyframeProperties(values)
 	selected.position = position
 	selected.orientation = orientation
 	selected.cframe = cframe
+	if values.easing then
+		selected.easing = values.easing
+	end
 	self.visuals:updateKeyframe(self.lastCam.name, selected)
 	self.ui:setKeyframeProperties(selected)
 	if self.cameraMode then
 		self:_applyCameraMode()
+	end
+end
+
+function module:prevKeyframe()
+	if not self.lastCam then return end
+	local store = self:storeFor(self.lastCam.name)
+	local previous = nil
+	for _, keyframe in ipairs(store:sorted()) do
+		if keyframe.time < self.currentTime - EPSILON then
+			previous = keyframe
+		else
+			break
+		end
+	end
+	if previous then
+		self:selectKeyframe(self.lastCam.name, previous)
+	end
+end
+
+function module:nextKeyframe()
+	if not self.lastCam then return end
+	local store = self:storeFor(self.lastCam.name)
+	for _, keyframe in ipairs(store:sorted()) do
+		if keyframe.time > self.currentTime + EPSILON then
+			self:selectKeyframe(self.lastCam.name, keyframe)
+			return
+		end
 	end
 end
 
@@ -571,12 +723,15 @@ function module:updateCameraByTime()
 	local entry = self:activeCam()
 	if not entry then return end
 
-	local prevKf, nextKf = store:findNeighbors(self.currentTime)
-	if prevKf and nextKf then
-		local span = nextKf.time - prevKf.time
-		local alpha = span > 0 and (self.currentTime - prevKf.time) / span or 0
-		alpha = math.clamp(alpha, 0, 1)
-		CameraResolver.setCFrame(entry, prevKf.cframe:Lerp(nextKf.cframe, alpha))
+			local prevKf, nextKf = store:findNeighbors(self.currentTime)
+		if prevKf and nextKf then
+			local span = nextKf.time - prevKf.time
+			local alpha = span > 0 and (self.currentTime - prevKf.time) / span or 0
+			alpha = math.clamp(alpha, 0, 1)
+			local easing = easingFunctions[prevKf.easing or (store.metadata and store.metadata.easing) or "EaseInOut"] or easingFunctions.EaseInOut
+			alpha = easing(alpha)
+			CameraResolver.setCFrame(entry, prevKf.cframe:Lerp(nextKf.cframe, alpha))
+
 	elseif prevKf then
 		CameraResolver.setCFrame(entry, prevKf.cframe)
 	elseif nextKf then
@@ -599,7 +754,9 @@ end
 function module:startLoop()
 	self.connections.RenderStepped = RunService.RenderStepped:Connect(function(dt)
 		if self.isPlaying then
-			self.currentTime = self.currentTime + dt
+			local store = self.lastCam and self:storeFor(self.lastCam.name)
+			local speedMultiplier = store and store.metadata and store.metadata.speedMultiplier or 1
+			self.currentTime = self.currentTime + dt * speedMultiplier
 			if self.currentTime >= Config.MaxTime then
 				self.currentTime = Config.MaxTime
 				self:pause()

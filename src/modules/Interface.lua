@@ -176,6 +176,7 @@ function module:buildTopBar()
 
 	self:buildCamerasModal()
 	self:buildTimelinePanel()
+	self:buildTrackPropertiesPanel()
 
 	return bar
 end
@@ -419,8 +420,11 @@ function module:buildCamerasModal()
 	properties.ZIndex = 52
 	properties.Visible = false
 	self.propertiesSection = properties
-	self.propertyFields = {}
-	local function sectionTitle(text, y)
+			self.propertyFields = {}
+		self.easingOptions = {"Linear", "EaseIn", "EaseOut", "EaseInOut"}
+		self.easingValue = "EaseInOut"
+		local function sectionTitle(text, y)
+
 		UIFactory.label({
 			Parent = properties,
 			Position = UDim2.new(0, 0, 0, y),
@@ -491,7 +495,34 @@ function module:buildCamerasModal()
 			self.onPropertiesSubmitted(self:getPropertyValues())
 		end
 	end)
-	local reset = UIFactory.button({
+			self.easingButton = UIFactory.button({
+			Parent = properties,
+			Position = UDim2.new(0, 0, 0, 146),
+			Size = UDim2.new(1, 0, 0, 26),
+			Text = "EASING: EASEINOUT",
+			Color = Theme.Panel,
+			Corner = 4,
+			TextSize = 10,
+			ZIndex = 53,
+		})
+		self.easingButton.MouseButton1Click:Connect(function()
+			local currentIndex = 1
+			for index, option in ipairs(self.easingOptions) do
+				if option == self.easingValue then
+					currentIndex = index
+					break
+				end
+			end
+			currentIndex = currentIndex % #self.easingOptions + 1
+			self.easingValue = self.easingOptions[currentIndex]
+			self:setButtonLabel(self.easingButton, "EASING: " .. string.upper(self.easingValue))
+			if self.onPropertiesSubmitted then
+				self.onPropertiesSubmitted(self:getPropertyValues())
+			end
+		end)
+		UIFactory.setIcon(self.easingButton, Icons.ChevronRight, {Color = Theme.TextDim, TextOffset = 20})
+		local reset = UIFactory.button({
+
 		Parent = properties,
 		Position = UDim2.new(0, 154, 0, 112),
 		Size = UDim2.new(0, 142, 0, 28),
@@ -527,12 +558,14 @@ end
 function module:getPropertyValues()
 	if not self.propertyKeyframe or not self.propertyFields then return nil end
 	local values = {}
-	for key, field in pairs(self.propertyFields) do
-		local value = tonumber(field.Text)
-		if not value then return nil end
-		values[key] = value
-	end
-	return values
+		for key, field in pairs(self.propertyFields) do
+			local value = tonumber(field.Text)
+			if not value then return nil end
+			values[key] = value
+		end
+		values.easing = self.easingValue or "EaseInOut"
+		return values
+
 end
 
 function module:setKeyframeProperties(data)
@@ -559,12 +592,17 @@ function module:setKeyframeProperties(data)
 		rotationY = orientation.Y,
 		rotationZ = orientation.Z,
 	}
-	for key, value in pairs(values) do
-		local field = self.propertyFields[key]
-		if field and not field:IsFocused() then
-			field.Text = string.format("%.3f", value)
+			for key, value in pairs(values) do
+			local field = self.propertyFields[key]
+			if field and not field:IsFocused() then
+				field.Text = string.format("%.3f", value)
+			end
 		end
-	end
+		self.easingValue = data.easing or "EaseInOut"
+		if self.easingButton then
+			self:setButtonLabel(self.easingButton, "EASING: " .. string.upper(self.easingValue))
+		end
+
 end
 
 function module:clearKeyframeProperties()
@@ -703,6 +741,198 @@ function module:setTimelineMinimized(minimized)
 		self:refreshTimelineAxis()
 	end
 	return self.timelineMinimized
+end
+
+function module:buildTrackPropertiesPanel()
+	local panel = UIFactory.frame({
+		Parent = self.gui,
+		Name = "TrackPropertiesPanel",
+		Size = UDim2.new(0, 268, 0, 188),
+		Position = UDim2.new(0, 12, 0, 50),
+		Color = Theme.Panel,
+		Corner = 6,
+		ZIndex = 60,
+	})
+	panel.Active = true
+	panel.Draggable = true
+	panel.Visible = false
+	UIFactory.stroke(panel, Theme.Border, 1)
+	UIFactory.shadow(panel, 0.18)
+	local header = UIFactory.frame({
+		Parent = panel,
+		Size = UDim2.new(1, 0, 0, 30),
+		Color = Theme.Header,
+		Corner = 6,
+		ZIndex = 61,
+	})
+	UIFactory.stroke(header, Theme.Border, 1)
+	self.trackPropertiesTitle = UIFactory.label({
+		Parent = header,
+		Position = UDim2.new(0, 10, 0, 0),
+		Size = UDim2.new(1, -42, 1, 0),
+		Text = "TRACK PROPERTIES",
+		Font = Enum.Font.GothamBold,
+		TextSize = 10,
+		Color = Theme.Text,
+		ZIndex = 62,
+	})
+	local closeButton = UIFactory.button({
+		Parent = header,
+		Position = UDim2.new(1, -26, 0.5, -10),
+		Size = UDim2.new(0, 20, 0, 20),
+		Text = "",
+		Color = Theme.Panel,
+		Corner = 3,
+		TextSize = 10,
+		ZIndex = 62,
+	})
+	UIFactory.setIcon(closeButton, Icons.X, {
+		IconOnly = true,
+		Color = Theme.TextDim,
+		Size = UDim2.new(0, 12, 0, 12),
+		Position = UDim2.new(0.5, -6, 0.5, -6),
+	})
+	local function fieldLabel(text, y)
+		UIFactory.label({
+			Parent = panel,
+			Position = UDim2.new(0, 12, 0, y),
+			Size = UDim2.new(1, -24, 0, 14),
+			Text = text,
+			Font = Enum.Font.GothamBold,
+			TextSize = 9,
+			Color = Theme.TextDim,
+			ZIndex = 61,
+		})
+	end
+	local function textField(name, y, placeholder)
+		local field = Instance.new("TextBox")
+		field.Name = name
+		field.Size = UDim2.new(1, -24, 0, 24)
+		field.Position = UDim2.new(0, 12, 0, y)
+		field.BackgroundColor3 = Theme.Background
+		field.BorderSizePixel = 0
+		field.ClearTextOnFocus = false
+		field.PlaceholderText = placeholder
+		field.PlaceholderColor3 = Theme.TextMuted
+		field.Font = Enum.Font.Code
+		field.TextSize = 10
+		field.TextColor3 = Theme.Text
+		field.TextXAlignment = Enum.TextXAlignment.Left
+		field.Parent = panel
+		field.ZIndex = 61
+		UIFactory.corner(field, 4)
+		UIFactory.stroke(field, Theme.Border, 1, 0.25)
+		return field
+	end
+	fieldLabel("TRACK NAME", 40)
+	self.trackRenameField = textField("TrackName", 54, "Camera name")
+	fieldLabel("SEGMENT SPEED MULTIPLIER", 84)
+	self.trackSpeedField = textField("SpeedMultiplier", 98, "1.00")
+	self.trackEasingOptions = {"Linear", "EaseIn", "EaseOut", "EaseInOut"}
+	self.trackPropertyEasing = "EaseInOut"
+	self.trackEasingButton = UIFactory.button({
+		Parent = panel,
+		Position = UDim2.new(0, 12, 0, 128),
+		Size = UDim2.new(1, -24, 0, 24),
+		Text = "EASING: EASEINOUT",
+		Color = Theme.Header,
+		Corner = 4,
+		TextSize = 10,
+		ZIndex = 61,
+	})
+	UIFactory.setIcon(self.trackEasingButton, Icons.ChevronRight, {Color = Theme.TextDim, TextOffset = 20})
+	local apply = UIFactory.button({
+		Parent = panel,
+		Position = UDim2.new(0, 12, 0, 158),
+		Size = UDim2.new(1, -24, 0, 22),
+		Text = "APPLY TRACK PROPERTIES",
+		Color = Theme.Accent,
+		Corner = 4,
+		TextSize = 9,
+		ZIndex = 61,
+	})
+	UIFactory.setIcon(apply, Icons.Check, {Color = Theme.Text, TextOffset = 18})
+	self.trackPropertiesPanel = panel
+	closeButton.MouseButton1Click:Connect(function()
+		self:closeTrackProperties()
+	end)
+	self.trackEasingButton.MouseButton1Click:Connect(function()
+		local currentIndex = 1
+		for index, option in ipairs(self.trackEasingOptions) do
+			if option == self.trackPropertyEasing then
+				currentIndex = index
+				break
+			end
+		end
+		currentIndex = currentIndex % #self.trackEasingOptions + 1
+		self.trackPropertyEasing = self.trackEasingOptions[currentIndex]
+		self:setButtonLabel(self.trackEasingButton, "EASING: " .. string.upper(self.trackPropertyEasing))
+	end)
+	apply.MouseButton1Click:Connect(function()
+		local values = self:getTrackPropertiesValues()
+		if values and self.onTrackPropertiesSubmitted and self.trackPropertiesCameraName then
+			self.onTrackPropertiesSubmitted(self.trackPropertiesCameraName, values)
+		end
+	end)
+end
+
+function module:setButtonLabel(button, text)
+	local label = UIFactory.getLabel(button)
+	if label then
+		label.Text = text
+	elseif button then
+		button.Text = text
+	end
+end
+
+function module:getTrackPropertiesValues()
+	if not self.trackRenameField or not self.trackSpeedField then return nil end
+	local name = string.gsub(self.trackRenameField.Text or "", "^%s*(.-)%s*$", "%1")
+	local speedMultiplier = tonumber(self.trackSpeedField.Text)
+	if name == "" or not speedMultiplier or speedMultiplier <= 0 then return nil end
+	return {
+		name = name,
+		speedMultiplier = speedMultiplier,
+		easing = self.trackPropertyEasing or "EaseInOut",
+	}
+end
+
+function module:openTrackProperties(cameraName, absolutePosition, metadata)
+	if not self.trackPropertiesPanel then return end
+	metadata = metadata or {}
+	self.trackPropertiesCameraName = cameraName
+	self.trackPropertiesTitle.Text = "TRACK: " .. string.upper(cameraName)
+	self.trackRenameField.Text = cameraName
+	self.trackSpeedField.Text = string.format("%.2f", metadata.speedMultiplier or 1)
+	self.trackPropertyEasing = metadata.easing or "EaseInOut"
+	self:setButtonLabel(self.trackEasingButton, "EASING: " .. string.upper(self.trackPropertyEasing))
+	local guiSize = self.gui.AbsoluteSize
+	local x = math.clamp((absolutePosition and absolutePosition.X or 12) + 12, 8, math.max(8, guiSize.X - 276))
+	local y = math.clamp((absolutePosition and absolutePosition.Y or 50) - 164, 46, math.max(46, guiSize.Y - 196))
+	self.trackPropertiesPanel.Position = UDim2.new(0, x, 0, y)
+	self.trackPropertiesPanel.Visible = true
+end
+
+function module:closeTrackProperties()
+	if self.trackPropertiesPanel then
+		self.trackPropertiesPanel.Visible = false
+	end
+	self.trackPropertiesCameraName = nil
+end
+
+function module:updateTrackName(oldName, newName)
+	if oldName == newName then return self.tracks[oldName] end
+	local track = self.tracks[oldName]
+	if not track or self.tracks[newName] then return nil end
+	self.tracks[oldName] = nil
+	self.tracks[newName] = track
+	track.cameraName = newName
+	track.row.Name = "Track_" .. newName
+	track.label.Text = newName
+	if self.activeCameraName == oldName then
+		self.activeCameraName = newName
+	end
+	return track
 end
 
 function module:buildTimelinePanel()
@@ -978,8 +1208,14 @@ function module:ensureTrack(cameraName)
 	}
 	row.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			if self.onTrackSelected then
-				self.onTrackSelected(cameraName)
+			local position = input.Position
+			if position.X < kfContainer.AbsolutePosition.X then
+				if self.onTrackSelected then
+					self.onTrackSelected(track.cameraName)
+				end
+				if self.onTrackPropertiesRequested then
+					self.onTrackPropertiesRequested(track.cameraName, row.AbsolutePosition)
+				end
 			end
 		end
 	end)
@@ -1004,6 +1240,9 @@ function module:setActiveCamera(cameraName)
 end
 
 function module:removeTrack(cameraName)
+	if self.trackPropertiesCameraName == cameraName then
+		self:closeTrackProperties()
+	end
 	local track = self.tracks[cameraName]
 	if not track then return end
 	if track.row and track.row.Parent then
@@ -1077,9 +1316,9 @@ function module:createKeyframeVisual(cameraName, time, data)
 	track.keyframes[#track.keyframes + 1] = record
 	diamond.MouseButton1Click:Connect(function()
 		if self.onKeyframeSelected then
-			self.onKeyframeSelected(cameraName, record.data or {
+			self.onKeyframeSelected((record.data and record.data.cameraName) or track.cameraName, record.data or {
 				time = record.time,
-				cameraName = cameraName,
+				cameraName = track.cameraName,
 			})
 		end
 	end)
