@@ -95,9 +95,21 @@ function module.new(interface, store, handles)
 		local store = self:storeFor(cameraName)
 		self.ui:openTrackProperties(cameraName, absolutePosition, store.metadata)
 	end
-	self.ui.onTrackPropertiesSubmitted = function(cameraName, values)
-		self:applyTrackProperties(cameraName, values)
-	end
+			self.ui.onTrackPropertiesSubmitted = function(cameraName, values)
+			self:applyTrackProperties(cameraName, values)
+		end
+		self.ui.onTrackResizeStarted = function(cameraName)
+			self.isDraggingPlayhead = false
+			self:selectCamera(cameraName, true)
+			self:pause()
+		end
+		self.ui.onTrackResized = function(cameraName, startTime, endTime)
+			self:applyTrackRange(cameraName, startTime, endTime)
+		end
+		self.ui.onTrackResizeEnded = function(cameraName, startTime, endTime)
+			self:applyTrackRange(cameraName, startTime, endTime)
+		end
+
 	self.handles.onChanged = function()
 		self:updateSelectedKeyframe()
 	end
@@ -146,21 +158,48 @@ function module:storeFor(cameraName)
 		self.storeByCamera[cameraName] = setmetatable({
 			keyframes = {},
 			selected = nil,
-			metadata = {
-				speedMultiplier = 1,
-				easing = "EaseInOut",
-			},
+							metadata = {
+					speedMultiplier = 1,
+					easing = "EaseInOut",
+					startTime = 0,
+					endTime = Config.MaxTime,
+				},
+
 		}, {__index = self.store})
 	end
 	local store = self.storeByCamera[cameraName]
-	store.metadata = store.metadata or {
-		speedMultiplier = 1,
-		easing = "EaseInOut",
-	}
-	return store
-end
+			store.metadata = store.metadata or {
+			speedMultiplier = 1,
+			easing = "EaseInOut",
+			startTime = 0,
+			endTime = Config.MaxTime,
+		}
+		store.metadata.startTime = tonumber(store.metadata.startTime) or 0
+		store.metadata.endTime = tonumber(store.metadata.endTime) or Config.MaxTime
+		return store
+	end
 
-function module:applyTrackProperties(cameraName, values)
+	function module:applyTrackRange(cameraName, startTime, endTime)
+		local store = self:storeFor(cameraName)
+		local maxTime = Config.MaxTime
+		local start = math.clamp(tonumber(startTime) or store.metadata.startTime or 0, 0, maxTime)
+		local finish = math.clamp(tonumber(endTime) or store.metadata.endTime or maxTime, 0, maxTime)
+		if finish < start then
+			start, finish = finish, start
+		end
+		if finish - start < 0.1 then
+			finish = math.min(maxTime, start + 0.1)
+			start = math.min(start, finish - 0.1)
+		end
+		store.metadata.startTime = start
+		store.metadata.endTime = finish
+		if self.lastCam and self.lastCam.name == cameraName and self.currentTime > finish then
+			self.currentTime = finish
+		end
+	end
+
+	function module:applyTrackProperties(cameraName, values)
+
 	if not cameraName or not values then return end
 	local entry = CameraResolver.get(cameraName)
 	if not entry then return end
@@ -275,7 +314,14 @@ function module:addCamera()
 	until not CameraResolver.get(name)
 	local character = Players.LocalPlayer.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
-	local spawnCFrame = root and (root.CFrame * CFrame.new(0, 1, -5)) or CFrame.new(0, 5, 10)
+	local flatForward = root and Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z) or Vector3.new(0, 0, -1)
+	if flatForward.Magnitude < EPSILON then
+		flatForward = Vector3.new(0, 0, -1)
+	else
+		flatForward = flatForward.Unit
+	end
+	local spawnPosition = root and (root.Position - flatForward * 5 + Vector3.new(0, 1, 0)) or Vector3.new(0, 5, 10)
+	local spawnCFrame = CFrame.lookAt(spawnPosition, spawnPosition + Vector3.new(0, 0, -1))
 	local camData = CameraResolver.createCam({
 		Name = name,
 		CFrame = spawnCFrame,
@@ -288,8 +334,11 @@ function module:addCamera()
 	self.lastCam = camData
 	self.visuals:addCamera(camData)
 
-	self.ui:ensureTrack(name)
-	self.ui:setActiveCamera(name)
+			self.ui:ensureTrack(name)
+		local store = self:storeFor(name)
+		self.ui:setTrackRange(name, store.metadata.startTime, store.metadata.endTime)
+		self.ui:setActiveCamera(name)
+
 	self:_refreshTimelineHeight()
 end
 
@@ -507,14 +556,29 @@ function module:togglePlayback()
 		self:play()
 	end
 end
-function module:play()
-	if self.currentTime >= Config.MaxTime then
-		self.currentTime = 0
+	function module:play()
+		local activeTrack = self.lastCam and self.ui.tracks[self.lastCam.name]
+		local activeEnd = activeTrack and (activeTrack.endTime or Config.MaxTime) or Config.MaxTime
+		if self.currentTime >= Config.MaxTime - EPSILON then
+			self.currentTime = activeTrack and (activeTrack.startTime or 0) or 0
+		elseif self.currentTime >= activeEnd - EPSILON then
+			local nextCamera = self:findNextPlaybackCamera()
+						if nextCamera then
+				local nextTrack = self.ui.tracks[nextCamera]
+				self:selectCamera(nextCamera, true)
+				local nextStart = nextTrack and (nextTrack.startTime or 0) or 0
+				local nextEnd = nextTrack and (nextTrack.endTime or Config.MaxTime) or Config.MaxTime
+				self.currentTime = math.clamp(self.currentTime, nextStart, nextEnd)
+			else
+
+				self.currentTime = activeTrack and (activeTrack.startTime or 0) or 0
+			end
+		end
 		self:updateCameraByTime()
 		self:updatePlayhead()
 		self:updateTimeLabel()
-	end
-	self.isPlaying = true
+		self.isPlaying = true
+
 	self:_updatePlaybackButton()
 end
 function module:pause()
@@ -774,6 +838,25 @@ function module:setupTimelineInput()
 	end)
 end
 
+function module:findNextPlaybackCamera()
+	if not self.lastCam or not self.ui or not self.ui.tracks then return nil end
+	local currentTrack = self.ui.tracks[self.lastCam.name]
+	if not currentTrack or not currentTrack.row then return nil end
+	local currentOrder = currentTrack.row.LayoutOrder
+	local currentEnd = currentTrack.endTime or Config.MaxTime
+	local candidateName = nil
+	local candidateOrder = math.huge
+	for name, track in pairs(self.ui.tracks) do
+		local store = self:storeFor(name)
+		local trackEnd = track.endTime or Config.MaxTime
+		if name ~= self.lastCam.name and track.row and track.row.LayoutOrder > currentOrder and track.row.LayoutOrder < candidateOrder and trackEnd > currentEnd + EPSILON and store:count() > 0 then
+			candidateName = name
+			candidateOrder = track.row.LayoutOrder
+		end
+	end
+	return candidateName
+end
+
 function module:updateCameraByTime()
 	if not self.lastCam then return end
 	local store = self:storeFor(self.lastCam.name)
@@ -812,16 +895,28 @@ end
 
 function module:startLoop()
 	self.connections.RenderStepped = RunService.RenderStepped:Connect(function(dt)
-		if self.isPlaying then
-			local store = self.lastCam and self:storeFor(self.lastCam.name)
-			local speedMultiplier = store and store.metadata and store.metadata.speedMultiplier or 1
-			self.currentTime = self.currentTime + dt * speedMultiplier
-			if self.currentTime >= Config.MaxTime then
-				self.currentTime = Config.MaxTime
-				self:pause()
+			if self.isPlaying then
+				local activeName = self.lastCam and self.lastCam.name
+				local store = activeName and self:storeFor(activeName)
+				local track = activeName and self.ui.tracks[activeName]
+				local speedMultiplier = store and store.metadata and store.metadata.speedMultiplier or 1
+				local trackEnd = track and (track.endTime or Config.MaxTime) or Config.MaxTime
+				self.currentTime = self.currentTime + dt * speedMultiplier
+				if self.currentTime >= trackEnd - EPSILON then
+					local nextCamera = self:findNextPlaybackCamera()
+					if nextCamera then
+						local nextTrack = self.ui.tracks[nextCamera]
+						self:selectCamera(nextCamera, true)
+						local nextStart = nextTrack and (nextTrack.startTime or 0) or 0
+						local nextEnd = nextTrack and (nextTrack.endTime or Config.MaxTime) or Config.MaxTime
+						self.currentTime = math.clamp(self.currentTime, nextStart, nextEnd)
+					else
+						self.currentTime = math.min(trackEnd, Config.MaxTime)
+						self:pause()
+					end
+				end
+				self:updateCameraByTime()
 			end
-			self:updateCameraByTime()
-		end
 
 		if self.isDraggingPlayhead then
 			local mousePos = UserInputService:GetMouseLocation()

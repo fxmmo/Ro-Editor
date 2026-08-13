@@ -34,6 +34,8 @@ local KF_LABEL_OFFSET = 180
 local TIMELINE_AXIS_LEFT = TRACK_PADDING + KF_LABEL_OFFSET
 local TIMELINE_AXIS_RIGHT = 26
 local KEYFRAME_HOLD_DURATION = 0.45
+local TRACK_RESIZE_MIN_TIME = 0.1
+local TRACK_RESIZE_HANDLE_WIDTH = 10
 
 local function getMaxTime()
 	return Config.MaxTime or 10
@@ -75,6 +77,8 @@ function module.new()
 	self.timelineExpandedHeight = 160
 	self.tracks = {}
 	self.activeCameraName = nil
+	self.trackResizeState = nil
+	self.trackResizeConnection = nil
 	return self
 end
 
@@ -1158,6 +1162,93 @@ function module:buildPlayhead()
 	bottomTriangle.ZIndex = 42
 end
 
+function module:setTrackRange(cameraName, startTime, endTime)
+	local track = self.tracks[cameraName]
+	if not track then return nil end
+	local maxTime = getMaxTime()
+	local start = math.clamp(tonumber(startTime) or track.startTime or 0, 0, maxTime)
+	local finish = math.clamp(tonumber(endTime) or track.endTime or maxTime, 0, maxTime)
+	if finish < start then
+		start, finish = finish, start
+	end
+	if finish - start < TRACK_RESIZE_MIN_TIME then
+		if self.trackResizeState and self.trackResizeState.side == "left" then
+			start = math.max(0, finish - TRACK_RESIZE_MIN_TIME)
+			finish = math.max(finish, start + TRACK_RESIZE_MIN_TIME)
+		else
+			finish = math.min(maxTime, start + TRACK_RESIZE_MIN_TIME)
+			start = math.min(start, finish - TRACK_RESIZE_MIN_TIME)
+		end
+	end
+	track.startTime = start
+	track.endTime = finish
+	if track.rangeVisual and track.rangeVisual.Parent then
+		track.rangeVisual.Position = UDim2.new(start / maxTime, 0, 0, 2)
+		track.rangeVisual.Size = UDim2.new((finish - start) / maxTime, 0, 1, -4)
+	end
+	if track.leftResizeHandle and track.leftResizeHandle.Parent then
+		track.leftResizeHandle.Position = UDim2.new(start / maxTime, -TRACK_RESIZE_HANDLE_WIDTH / 2, 0, -2)
+	end
+	if track.rightResizeHandle and track.rightResizeHandle.Parent then
+		track.rightResizeHandle.Position = UDim2.new(finish / maxTime, -TRACK_RESIZE_HANDLE_WIDTH / 2, 0, -2)
+	end
+	return start, finish
+end
+
+function module:endTrackResize()
+	local state = self.trackResizeState
+	self.trackResizeState = nil
+	if self.trackResizeConnection then
+		self.trackResizeConnection:Disconnect()
+		self.trackResizeConnection = nil
+	end
+	if state and self.onTrackResizeEnded then
+		self.onTrackResizeEnded(state.cameraName, state.startTime, state.endTime)
+	end
+end
+
+function module:beginTrackResize(cameraName, side, input)
+	local track = self.tracks[cameraName]
+	if not track then return end
+	self:endTrackResize()
+	self.trackResizeState = {
+		cameraName = cameraName,
+		side = side,
+		startTime = track.startTime or 0,
+		endTime = track.endTime or getMaxTime(),
+	}
+	if self.onTrackSelected then
+		self.onTrackSelected(cameraName)
+	end
+	if self.onTrackResizeStarted then
+		self.onTrackResizeStarted(cameraName, self.trackResizeState.startTime, self.trackResizeState.endTime)
+	end
+	self.trackResizeConnection = UserInputService.InputChanged:Connect(function(changedInput)
+		local state = self.trackResizeState
+		if not state then return end
+		if changedInput.UserInputType ~= Enum.UserInputType.MouseMovement and changedInput.UserInputType ~= Enum.UserInputType.Touch then return end
+		local targetTime = self:xToTime(changedInput.Position.X)
+		local startTime = state.startTime
+		local endTime = state.endTime
+		if state.side == "left" then
+			startTime = math.clamp(targetTime, 0, endTime - TRACK_RESIZE_MIN_TIME)
+		else
+			endTime = math.clamp(targetTime, startTime + TRACK_RESIZE_MIN_TIME, getMaxTime())
+		end
+		local nextStart, nextEnd = self:setTrackRange(cameraName, startTime, endTime)
+		state.startTime = nextStart or startTime
+		state.endTime = nextEnd or endTime
+		if self.onTrackResized then
+			self.onTrackResized(cameraName, state.startTime, state.endTime)
+		end
+	end)
+	input.Changed:Connect(function()
+		if input.UserInputState == Enum.UserInputState.End then
+			self:endTrackResize()
+		end
+	end)
+end
+
 function module:ensureTrack(cameraName)
 	if self.tracks[cameraName] then return self.tracks[cameraName] end
 
@@ -1172,6 +1263,7 @@ function module:ensureTrack(cameraName)
 	row.ZIndex = 12
 	UIFactory.corner(row, 4)
 	UIFactory.stroke(row, Theme.Border, 1, 0.5)
+	local selectionStroke = UIFactory.stroke(row, Theme.Accent, 2.5, 1)
 
 	local grad = Instance.new("UIGradient")
 	grad.Color = ColorSequence.new{
@@ -1197,9 +1289,45 @@ function module:ensureTrack(cameraName)
 	kfContainer.Size = UDim2.new(1, -KF_LABEL_OFFSET - 10, 1, 0)
 	kfContainer.Position = UDim2.new(0, KF_LABEL_OFFSET, 0, 0)
 	kfContainer.BackgroundTransparency = 1
-	kfContainer.ClipsDescendants = true
+	kfContainer.ClipsDescendants = false
 	kfContainer.Parent = row
 	kfContainer.ZIndex = 13
+
+		local rangeVisual = UIFactory.frame({
+			Parent = kfContainer,
+			Size = UDim2.new(1, 0, 1, -4),
+			Position = UDim2.new(0, 0, 0, 2),
+			Color = Theme.Accent,
+			Name = "TrackRange",
+			ZIndex = 13,
+		})
+		rangeVisual.BackgroundTransparency = 0.88
+		UIFactory.corner(rangeVisual, 3)
+		local rangeStroke = UIFactory.stroke(rangeVisual, Theme.Accent, 1.5, 0.35)
+
+		local function createResizeHandle(side)
+			local handle = Instance.new("Frame")
+			handle.Name = side == "left" and "LeftResizeHandle" or "RightResizeHandle"
+			handle.Size = UDim2.new(0, TRACK_RESIZE_HANDLE_WIDTH, 1, 4)
+			handle.Position = UDim2.new(side == "left" and 0 or 1, -TRACK_RESIZE_HANDLE_WIDTH / 2, 0, -2)
+			handle.BackgroundColor3 = Theme.Accent
+			handle.BackgroundTransparency = 0.08
+			handle.BorderSizePixel = 0
+			handle.Active = true
+			handle.ZIndex = 16
+			handle.Parent = kfContainer
+			UIFactory.corner(handle, 3)
+			handle.Visible = false
+			handle.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+					self:beginTrackResize(cameraName, side, input)
+				end
+			end)
+			return handle
+		end
+
+		local leftResizeHandle = createResizeHandle("left")
+		local rightResizeHandle = createResizeHandle("right")
 
 	local track = {
 		row = row,
@@ -1207,7 +1335,15 @@ function module:ensureTrack(cameraName)
 		keyframesContainer = kfContainer,
 		keyframes = {},
 		activeKeyframe = nil,
-		cameraName = cameraName,
+			cameraName = cameraName,
+			selectionStroke = selectionStroke,
+			rangeVisual = rangeVisual,
+			rangeStroke = rangeStroke,
+			leftResizeHandle = leftResizeHandle,
+			rightResizeHandle = rightResizeHandle,
+			startTime = 0,
+			endTime = getMaxTime(),
+
 	}
 	row.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -1223,7 +1359,9 @@ function module:ensureTrack(cameraName)
 		end
 	end)
 	self.tracks[cameraName] = track
-	self:refreshTimelineAxis()
+	self:setTrackRange(cameraName, 0, getMaxTime())
+		self:refreshTimelineAxis()
+
 	task.defer(function()
 		if self.tracks[cameraName] == track then
 			self:refreshTimelineAxis()
@@ -1236,10 +1374,23 @@ function module:setActiveCamera(cameraName)
 	self.activeCameraName = cameraName
 	for name, tr in pairs(self.tracks) do
 		local highlight = (name == cameraName)
-		tr.row.BackgroundColor3 = highlight
-			and Theme.Accent:Lerp(Theme.Panel, 0.25)
-			or Theme.Panel
-	end
+			tr.row.BackgroundColor3 = highlight
+				and Theme.Accent:Lerp(Theme.Panel, 0.25)
+				or Theme.Panel
+			if tr.selectionStroke then
+				tr.selectionStroke.Transparency = highlight and 0 or 1
+			end
+			if tr.rangeStroke then
+				tr.rangeStroke.Transparency = highlight and 0.1 or 0.35
+			end
+			if tr.leftResizeHandle then
+				tr.leftResizeHandle.Visible = highlight
+			end
+			if tr.rightResizeHandle then
+				tr.rightResizeHandle.Visible = highlight
+			end
+		end
+
 end
 
 function module:removeTrack(cameraName)
