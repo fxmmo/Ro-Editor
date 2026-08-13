@@ -1,4 +1,4 @@
-local DEV_VERSION = "2026-08-12-nav-curves-trackprops"
+local DEV_VERSION = "2026-08-13-keyframe-drag"
 local _cache = {}
 local Dev = _G.__RoEditorDev
 if not Dev or Dev.__RoEditorVersion ~= DEV_VERSION then

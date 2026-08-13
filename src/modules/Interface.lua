@@ -20,6 +20,7 @@ end
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua") or error("[Ro-Editor] import failed")
 local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua") or error("[Ro-Editor] import failed")
 local Icons = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Icon_Config.lua") or error("[Ro-Editor] import failed")
@@ -32,6 +33,7 @@ local TRACK_PADDING = 8
 local KF_LABEL_OFFSET = 180
 local TIMELINE_AXIS_LEFT = TRACK_PADDING + KF_LABEL_OFFSET
 local TIMELINE_AXIS_RIGHT = 26
+local KEYFRAME_HOLD_DURATION = 0.45
 
 local function getMaxTime()
 	return Config.MaxTime or 10
@@ -948,6 +950,7 @@ function module:buildTimelinePanel()
 		ZIndex = 10,
 	})
 	self.timelinePanel = panel
+	panel.Active = true
 	UIFactory.stroke(panel, Theme.Border, 1)
 	UIFactory.shadow(panel, 0.1)
 
@@ -1312,9 +1315,15 @@ function module:createKeyframeVisual(cameraName, time, data)
 		guide = guide,
 		expanded = false,
 		data = data,
+		dragging = false,
+		suppressClick = false,
 	}
 	track.keyframes[#track.keyframes + 1] = record
 	diamond.MouseButton1Click:Connect(function()
+		if record.suppressClick then
+			record.suppressClick = false
+			return
+		end
 		if self.onKeyframeSelected then
 			self.onKeyframeSelected((record.data and record.data.cameraName) or track.cameraName, record.data or {
 				time = record.time,
@@ -1325,20 +1334,91 @@ function module:createKeyframeVisual(cameraName, time, data)
 
 	local defaultSize = diamond.Size
 	local hoverSize = UDim2.new(0, 16, 0, 16)
+	local function updateVisual(targetTime)
+		local normalized = math.clamp(targetTime or record.time or 0, 0, maxTime)
+		local currentX = normalized / maxTime
+		record.time = normalized
+		if record.data then
+			record.data.time = normalized
+		end
+		diamond.Name = "Keyframe_" .. tostring(normalized)
+		guide.Position = UDim2.new(currentX, 0, 0, -4)
+		diamond.Position = UDim2.new(
+			currentX,
+			record.expanded and -9 or -6,
+			0.5,
+			record.expanded and -9 or -6
+		)
+	end
+
+	local function endPress()
+		self.keyframePressActive = false
+		if self.keyframePressedRecord ~= record then return end
+		self.keyframePressedRecord = nil
+		if record.dragging then
+			record.dragging = false
+			record.suppressClick = true
+			if self.keyframeDragConnection then
+				self.keyframeDragConnection:Disconnect()
+				self.keyframeDragConnection = nil
+			end
+			if self.onKeyframeDragEnded then
+				self.onKeyframeDragEnded((record.data and record.data.cameraName) or track.cameraName, record.data)
+			end
+			task.delay(0.1, function()
+				record.suppressClick = false
+			end)
+		end
+	end
+
 	diamond.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseMovement then
 			TweenService:Create(diamond, TweenInfo.new(0.15), {
 				Size = hoverSize,
-				Position = UDim2.new(xPos, -8, 0.5, -8),
+				Position = UDim2.new(record.time / maxTime, -8, 0.5, -8),
 			}):Play()
+			return
 		end
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+		self.keyframePressActive = true
+		self.keyframePressedRecord = record
+		self.keyframePressId = (self.keyframePressId or 0) + 1
+		local pressId = self.keyframePressId
+		if self.onKeyframePressStarted then
+			self.onKeyframePressStarted()
+		end
+		task.delay(KEYFRAME_HOLD_DURATION, function()
+			if not self.keyframePressActive or self.keyframePressId ~= pressId or self.keyframePressedRecord ~= record then return end
+			record.dragging = true
+			record.suppressClick = true
+			if self.onKeyframeDragStarted then
+				self.onKeyframeDragStarted((record.data and record.data.cameraName) or track.cameraName, record.data)
+			end
+			if self.keyframeDragConnection then
+				self.keyframeDragConnection:Disconnect()
+			end
+			self.keyframeDragConnection = UserInputService.InputChanged:Connect(function(changedInput)
+				if not record.dragging then return end
+				if changedInput.UserInputType ~= Enum.UserInputType.MouseMovement and changedInput.UserInputType ~= Enum.UserInputType.Touch then return end
+				local targetTime = self:xToTime(changedInput.Position.X)
+				if self.onKeyframeDragged then
+					targetTime = self.onKeyframeDragged((record.data and record.data.cameraName) or track.cameraName, record.data, targetTime) or targetTime
+				end
+				updateVisual(targetTime)
+			end)
+		end)
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				endPress()
+			end
+		end)
 	end)
 	diamond.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseMovement then
 			TweenService:Create(diamond, TweenInfo.new(0.15), {
 				Size = record.expanded and UDim2.new(0, 18, 0, 18) or defaultSize,
 				Position = UDim2.new(
-					xPos,
+					record.time / maxTime,
 					record.expanded and -9 or -6,
 					0.5,
 					record.expanded and -9 or -6

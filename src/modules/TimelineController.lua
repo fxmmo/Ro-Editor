@@ -52,6 +52,7 @@ function module.new(interface, store, handles)
 	self.isPlaying = false
 	self.currentTime = 0
 	self.isDraggingPlayhead = false
+	self.isDraggingKeyframe = false
 	self.editMode = false
 	self.editTool = "move"
 	self.cameraMode = false
@@ -67,6 +68,18 @@ function module.new(interface, store, handles)
 	end
 	self.ui.onKeyframeSelected = function(cameraName, data)
 		self:selectKeyframe(cameraName, data)
+	end
+	self.ui.onKeyframePressStarted = function()
+		self.isDraggingPlayhead = false
+	end
+	self.ui.onKeyframeDragStarted = function(cameraName, data)
+		self:beginKeyframeDrag(cameraName, data)
+	end
+	self.ui.onKeyframeDragged = function(cameraName, data, targetTime)
+		return self:moveKeyframe(cameraName, data, targetTime)
+	end
+	self.ui.onKeyframeDragEnded = function(cameraName, data)
+		self:endKeyframeDrag(cameraName, data)
 	end
 	self.ui.onPropertiesSubmitted = function(values)
 		self:applySelectedKeyframeProperties(values)
@@ -621,6 +634,50 @@ function module:nextKeyframe()
 	end
 end
 
+function module:beginKeyframeDrag(cameraName, data)
+	if not cameraName or not data then return end
+	self:selectCamera(cameraName, true)
+	local store = self:storeFor(cameraName)
+	store:setSelected(data)
+	self.isDraggingKeyframe = true
+	self.isDraggingPlayhead = false
+	self:pause()
+	if self.tweenConnection then
+		self.tweenConnection:Disconnect()
+		self.tweenConnection = nil
+	end
+	self.ui:setKeyframeProperties(data)
+end
+
+function module:moveKeyframe(cameraName, data, targetTime)
+	if not self.isDraggingKeyframe or not cameraName or not data then return data and data.time or targetTime end
+	local store = self:storeFor(cameraName)
+	local target = math.clamp(targetTime or data.time or 0, 0, Config.MaxTime)
+	for _, candidate in ipairs(store.keyframes) do
+		if candidate ~= data and math.abs(candidate.time - target) < 0.02 then
+			return data.time
+		end
+	end
+	data.time = target
+	self.currentTime = target
+	store:setSelected(data)
+	self.visuals:setKeyframes(cameraName, store:sorted())
+	self.ui:setKeyframeProperties(data)
+	self:updatePlayhead()
+	self:updateTimeLabel()
+	return target
+end
+
+function module:endKeyframeDrag(cameraName, data)
+	if not data then return end
+	self.isDraggingKeyframe = false
+	self.isDraggingPlayhead = false
+	self.currentTime = data.time or self.currentTime
+	self.ui:setKeyframeProperties(data)
+	self:updatePlayhead()
+	self:updateTimeLabel()
+end
+
 function module:selectKeyframe(camName, data)
 	self:selectCamera(camName, true)
 	local store = self:storeFor(camName)
@@ -702,7 +759,9 @@ function module:setupTimelineInput()
 	self.ui.area.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch then
-			self.isDraggingPlayhead = true
+			if not self.isDraggingKeyframe and not self.ui.keyframePressActive then
+				self.isDraggingPlayhead = true
+			end
 		end
 	end)
 
