@@ -76,6 +76,7 @@ function module.new()
 	self.timelineMinimized = false
 	self.timelineExpandedHeight = 160
 	self.tracks = {}
+	self.trackOrder = 0
 	self.activeCameraName = nil
 	self.trackResizeState = nil
 	self.trackResizeConnection = nil
@@ -100,6 +101,17 @@ function module:getTimelineAxis()
 	return left, math.max(width, 1)
 end
 
+function module:getRulerAxis()
+	if not self.area then
+		return TIMELINE_AXIS_LEFT, 1
+	end
+	local areaPosition = self.area.AbsolutePosition.X
+	if self.tracksList and self.tracksList.Parent then
+		return self.tracksList.AbsolutePosition.X - areaPosition, math.max(self.tracksList.AbsoluteSize.X, 1)
+	end
+	return fallbackTimelineAxis(self.area.AbsoluteSize.X)
+end
+
 function module:timeToX(t)
 	local maxTime = getMaxTime()
 	local left, width = self:getTimelineAxis()
@@ -116,12 +128,14 @@ end
 
 function module:refreshTimelineAxis()
 	if not self.area then return end
-	local left, width = self:getTimelineAxis()
-	if self.ruler and self.ruler.Parent then
-		self.ruler.Position = UDim2.new(0, left, 0, 4)
-		self.ruler.Size = UDim2.new(0, width, 0, 22)
-	end
-	if self.playheadLine and self.playheadLine.Parent then
+			local rulerLeft, rulerWidth = self:getRulerAxis()
+		if self.ruler and self.ruler.Parent then
+			self.ruler.Position = UDim2.new(0, rulerLeft, 0, 4)
+			self.ruler.Size = UDim2.new(0, rulerWidth, 0, 22)
+		end
+		local left = self:getTimelineAxis()
+		if self.playheadLine and self.playheadLine.Parent then
+
 		self.playheadLine.Position = UDim2.new(0, left - 1, 0, 4)
 	end
 end
@@ -1062,8 +1076,9 @@ function module:buildRuler()
 	if self.ruler and self.ruler.Parent then
 		self.ruler:Destroy()
 	end
-	local left, width = self:getTimelineAxis()
-	local ruler = UIFactory.frame({
+			local left, width = self:getRulerAxis()
+		local ruler = UIFactory.frame({
+
 		Parent = self.area,
 		Size = UDim2.new(0, width, 0, 22),
 		Position = UDim2.new(0, left, 0, 4),
@@ -1256,9 +1271,12 @@ function module:ensureTrack(cameraName)
 	row.Name = "Track_" .. cameraName
 	row.Size = UDim2.new(1, -8, 0, 36)
 	row.BackgroundColor3 = Theme.Panel
+	row.BackgroundTransparency = 1
 	row.BorderSizePixel = 0
-	row.Active = true
-	row.LayoutOrder = #self.tracks + 1
+			row.Active = true
+		self.trackOrder += 1
+		row.LayoutOrder = self.trackOrder
+
 	row.Parent = self.tracksList
 	row.ZIndex = 12
 	UIFactory.corner(row, 4)
@@ -1272,6 +1290,16 @@ function module:ensureTrack(cameraName)
 	}
 	grad.Rotation = 90
 	grad.Parent = row
+
+	local labelSurface = UIFactory.frame({
+		Parent = row,
+		Position = UDim2.new(0, 0, 0, 2),
+		Size = UDim2.new(0, KF_LABEL_OFFSET - 8, 1, -4),
+		Color = Theme.Panel,
+		Name = "TrackLabelArea",
+		ZIndex = 12,
+	})
+	UIFactory.corner(labelSurface, 4)
 
 	local label = UIFactory.label({
 		Parent = row,
@@ -1301,9 +1329,11 @@ function module:ensureTrack(cameraName)
 			Name = "TrackRange",
 			ZIndex = 13,
 		})
-		rangeVisual.BackgroundTransparency = 0.88
+				rangeVisual.BackgroundTransparency = 0.76
+
 		UIFactory.corner(rangeVisual, 3)
 		local rangeStroke = UIFactory.stroke(rangeVisual, Theme.Accent, 1.5, 0.35)
+		grad.Parent = rangeVisual
 
 		local function createResizeHandle(side)
 			local handle = Instance.new("Frame")
@@ -1331,6 +1361,7 @@ function module:ensureTrack(cameraName)
 
 	local track = {
 		row = row,
+		labelSurface = labelSurface,
 		label = label,
 		keyframesContainer = kfContainer,
 		keyframes = {},
@@ -1374,14 +1405,20 @@ function module:setActiveCamera(cameraName)
 	self.activeCameraName = cameraName
 	for name, tr in pairs(self.tracks) do
 		local highlight = (name == cameraName)
-			tr.row.BackgroundColor3 = highlight
-				and Theme.Accent:Lerp(Theme.Panel, 0.25)
-				or Theme.Panel
+						tr.row.BackgroundColor3 = Theme.Panel
+				if tr.labelSurface then
+					tr.labelSurface.BackgroundColor3 = highlight and Theme.Accent:Lerp(Theme.Panel, 0.25) or Theme.Panel
+				end
+
 			if tr.selectionStroke then
-				tr.selectionStroke.Transparency = highlight and 0 or 1
+				tr.selectionStroke.Transparency = 1
 			end
 			if tr.rangeStroke then
-				tr.rangeStroke.Transparency = highlight and 0.1 or 0.35
+				tr.rangeStroke.Transparency = highlight and 0 or 0.35
+			end
+			if tr.rangeVisual then
+				tr.rangeVisual.BackgroundTransparency = highlight and 0.72 or 0.88
+				tr.rangeVisual.BackgroundColor3 = highlight and Theme.Accent:Lerp(Theme.Panel, 0.35) or Theme.Panel
 			end
 			if tr.leftResizeHandle then
 				tr.leftResizeHandle.Visible = highlight
