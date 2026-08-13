@@ -1,4 +1,4 @@
-local DEV_VERSION = "2026-08-13-camera-frustum"
+local DEV_VERSION = "2026-08-13-camera-frustum-scale"
 local _cache = {}
 local Dev = _G.__RoEditorDev
 if not Dev or Dev.__RoEditorVersion ~= DEV_VERSION then

@@ -22,7 +22,7 @@ local Theme = ThemeConfig.Theme
 local module = {}
 module.__index = module
 
-local DIRECTION_LENGTH = 4
+local DIRECTION_LENGTH = 2.4
 
 local function keyFor(time)
 	return string.format("%.6f", tonumber(time) or 0)
@@ -59,7 +59,7 @@ function module:_createMarker(entry)
 	marker.Shape = Enum.PartType.Block
 	marker.Material = Enum.Material.Neon
 	marker.Color = Theme.Accent
-	marker.Size = Vector3.new(0.9, 0.9, 0.22)
+	marker.Size = Vector3.new(0.9, 0.9, 0.9)
 	marker.CFrame = entry.part.CFrame
 	marker.Transparency = self.visible and 0.08 or 1
 	marker.Parent = self.folder
@@ -74,22 +74,22 @@ function module:_createMarker(entry)
 	directionFrame.Shape = Enum.PartType.Block
 	directionFrame.Material = Enum.Material.Neon
 	directionFrame.Color = Theme.Success or Theme.Accent
-	directionFrame.Size = Vector3.new(1.25, 1.05, 0.06)
+	directionFrame.Size = Vector3.new(2.7, 2.2, 0.07)
 	directionFrame.CFrame = entry.part.CFrame * CFrame.new(0, 0, -DIRECTION_LENGTH)
-	directionFrame.Transparency = self.visible and 0.45 or 1
+	directionFrame.Transparency = self.visible and 0.3 or 1
 	directionFrame.Parent = self.folder
 
 	local startOffsets = {
-		Vector3.new(-0.45, -0.45, -0.11),
-		Vector3.new(0.45, -0.45, -0.11),
-		Vector3.new(0.45, 0.45, -0.11),
-		Vector3.new(-0.45, 0.45, -0.11),
+		Vector3.new(-0.45, -0.45, -0.45),
+		Vector3.new(0.45, -0.45, -0.45),
+		Vector3.new(0.45, 0.45, -0.45),
+		Vector3.new(-0.45, 0.45, -0.45),
 	}
 	local endOffsets = {
-		Vector3.new(-0.625, -0.525, 0),
-		Vector3.new(0.625, -0.525, 0),
-		Vector3.new(0.625, 0.525, 0),
-		Vector3.new(-0.625, 0.525, 0),
+		Vector3.new(-1.35, -1.1, 0),
+		Vector3.new(1.35, -1.1, 0),
+		Vector3.new(1.35, 1.1, 0),
+		Vector3.new(-1.35, 1.1, 0),
 	}
 	local directionBeams = {}
 	for index = 1, #startOffsets do
@@ -320,7 +320,7 @@ function module:setVisible(visible)
 	self.visible = visible and true or false
 	for _, record in pairs(self.cameraMarkers) do
 		if record.marker then record.marker.Transparency = self.visible and 0.08 or 1 end
-		if record.directionFrame then record.directionFrame.Transparency = self.visible and 0.45 or 1 end
+		if record.directionFrame then record.directionFrame.Transparency = self.visible and 0.3 or 1 end
 		for _, beam in ipairs(record.directionBeams or {}) do
 			if beam then beam.Enabled = self.visible end
 		end
