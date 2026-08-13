@@ -22,6 +22,8 @@ local Theme = ThemeConfig.Theme
 local module = {}
 module.__index = module
 
+local DIRECTION_LENGTH = 4
+
 local function keyFor(time)
 	return string.format("%.6f", tonumber(time) or 0)
 end
@@ -62,6 +64,40 @@ function module:_createMarker(entry)
 	marker.Transparency = self.visible and 0.08 or 1
 	marker.Parent = self.folder
 
+	local directionTarget = Instance.new("Part")
+	directionTarget.Name = entry.name .. "_DirectionTarget"
+	directionTarget.Anchored = true
+	directionTarget.CanCollide = false
+	directionTarget.CanTouch = false
+	directionTarget.CanQuery = false
+	directionTarget.CastShadow = false
+	directionTarget.Shape = Enum.PartType.Ball
+	directionTarget.Material = Enum.Material.Neon
+	directionTarget.Color = Theme.Success or Theme.Accent
+	directionTarget.Size = Vector3.new(0.26, 0.26, 0.26)
+	directionTarget.CFrame = entry.part.CFrame * CFrame.new(0, 0, -DIRECTION_LENGTH)
+	directionTarget.Transparency = self.visible and 0.05 or 1
+	directionTarget.Parent = self.folder
+
+	local directionStart = Instance.new("Attachment")
+	directionStart.Name = "DirectionStart"
+	directionStart.Parent = marker
+	local directionEnd = Instance.new("Attachment")
+	directionEnd.Name = "DirectionEnd"
+	directionEnd.Parent = directionTarget
+	local directionBeam = Instance.new("Beam")
+	directionBeam.Name = "CameraDirection"
+	directionBeam.Attachment0 = directionStart
+	directionBeam.Attachment1 = directionEnd
+	directionBeam.Color = ColorSequence.new(Theme.Success or Theme.Accent)
+	directionBeam.Transparency = NumberSequence.new(0.12)
+	directionBeam.Width0 = 0.12
+	directionBeam.Width1 = 0.045
+	directionBeam.FaceCamera = true
+	directionBeam.LightEmission = 0.8
+	directionBeam.Enabled = self.visible
+	directionBeam.Parent = marker
+
 	local highlight = Instance.new("Highlight")
 	highlight.Name = "CameraHighlight"
 	highlight.Adornee = marker
@@ -99,6 +135,8 @@ function module:_createMarker(entry)
 	self.cameraMarkers[entry.name] = {
 		entry = entry,
 		marker = marker,
+		directionTarget = directionTarget,
+		directionBeam = directionBeam,
 		highlight = highlight,
 		billboard = billboard,
 	}
@@ -116,9 +154,13 @@ function module:renameCamera(oldName, newName, entry)
 		self.cameraMarkers[oldName] = nil
 		self.cameraMarkers[newName] = markerRecord
 		markerRecord.entry = entry or markerRecord.entry
-		if markerRecord.marker then
-			markerRecord.marker.Name = newName .. "_Marker"
-		end
+					if markerRecord.marker then
+				markerRecord.marker.Name = newName .. "_Marker"
+			end
+			if markerRecord.directionTarget then
+				markerRecord.directionTarget.Name = newName .. "_DirectionTarget"
+			end
+
 		if markerRecord.billboard then
 			local label = markerRecord.billboard:FindFirstChild("Text")
 			if label then
@@ -138,6 +180,9 @@ end
 
 function module:removeCamera(cameraName)
 	local record = self.cameraMarkers[cameraName]
+	if record and record.directionTarget then
+		record.directionTarget:Destroy()
+	end
 	if record and record.marker then
 		record.marker:Destroy()
 	end
@@ -257,6 +302,8 @@ function module:setVisible(visible)
 	self.visible = visible and true or false
 	for _, record in pairs(self.cameraMarkers) do
 		if record.marker then record.marker.Transparency = self.visible and 0.08 or 1 end
+		if record.directionTarget then record.directionTarget.Transparency = self.visible and 0.05 or 1 end
+		if record.directionBeam then record.directionBeam.Enabled = self.visible end
 		if record.highlight then
 			record.highlight.Enabled = self.visible
 			record.highlight.FillTransparency = self.visible and 0.45 or 1
@@ -278,6 +325,9 @@ function module:sync()
 	for _, record in pairs(self.cameraMarkers) do
 		if record.entry and record.entry.part and record.marker and record.marker.Parent then
 			record.marker.CFrame = record.entry.part.CFrame
+			if record.directionTarget and record.directionTarget.Parent then
+				record.directionTarget.CFrame = record.entry.part.CFrame * CFrame.new(0, 0, -DIRECTION_LENGTH)
+			end
 		end
 	end
 end
