@@ -1334,6 +1334,15 @@ function module:ensureTrack(cameraName)
 		UIFactory.corner(rangeVisual, 3)
 		local rangeStroke = UIFactory.stroke(rangeVisual, Theme.Accent, 1.5, 0.35)
 		grad.Parent = rangeVisual
+		labelSurface.Parent = rangeVisual
+		labelSurface.Position = UDim2.new(0, 8, 0, 3)
+		labelSurface.Size = UDim2.new(0, 112, 1, -6)
+		labelSurface.BackgroundTransparency = 0.24
+		labelSurface.ZIndex = 14
+		label.Parent = labelSurface
+		label.Position = UDim2.new(0, 8, 0, 0)
+		label.Size = UDim2.new(1, -16, 1, 0)
+		label.ZIndex = 15
 
 		local function createResizeHandle(side)
 			local handle = Instance.new("Frame")
