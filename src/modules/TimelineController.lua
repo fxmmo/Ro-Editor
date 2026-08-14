@@ -90,11 +90,18 @@ function module.new(interface, store, handles)
 	self.ui.onNextKeyframe = function()
 		self:nextKeyframe()
 	end
-	self.ui.onTrackPropertiesRequested = function(cameraName, absolutePosition)
-		self:selectCamera(cameraName)
-		local store = self:storeFor(cameraName)
-		self.ui:openTrackProperties(cameraName, absolutePosition, store.metadata)
-	end
+			self.ui.onTrackPropertiesRequested = function(cameraName)
+			self:selectCamera(cameraName)
+		end
+		self.ui.onTrackPropertiesButtonRequested = function()
+			if not self.lastCam then return end
+			local cameraName = self.lastCam.name
+			local track = self.ui.tracks[cameraName]
+			local store = self:storeFor(cameraName)
+			local position = track and track.rangeVisual and track.rangeVisual.AbsolutePosition or Vector2.new(12, 50)
+			self.ui:openTrackProperties(cameraName, position, store.metadata)
+		end
+
 			self.ui.onTrackPropertiesSubmitted = function(cameraName, values)
 			self:applyTrackProperties(cameraName, values)
 		end
@@ -838,6 +845,36 @@ function module:setupTimelineInput()
 	end)
 end
 
+function module:findTopPlaybackCamera()
+	if not self.ui or not self.ui.tracks then return nil end
+	local candidateName = nil
+	local candidateOrder = math.huge
+	for name, track in pairs(self.ui.tracks) do
+		local store = self:storeFor(name)
+		if track.row and track.row.LayoutOrder < candidateOrder and store:count() > 0 then
+			candidateName = name
+			candidateOrder = track.row.LayoutOrder
+		end
+	end
+	return candidateName
+end
+
+function module:resetToTopPlaybackCamera()
+	local topCamera = self:findTopPlaybackCamera()
+	if topCamera then
+		self:selectCamera(topCamera, true)
+		local track = self.ui.tracks[topCamera]
+		local topStart = track and (track.startTime or 0) or 0
+		local topEnd = track and (track.endTime or Config.MaxTime) or Config.MaxTime
+		self.currentTime = math.clamp(topStart, 0, topEnd)
+		self:updateCameraByTime()
+	else
+		self.currentTime = 0
+	end
+	self:updatePlayhead()
+	self:updateTimeLabel()
+end
+
 function module:findNextPlaybackCamera()
 	if not self.lastCam or not self.ui or not self.ui.tracks then return nil end
 	local currentTrack = self.ui.tracks[self.lastCam.name]
@@ -911,7 +948,7 @@ function module:startLoop()
 						local nextEnd = nextTrack and (nextTrack.endTime or Config.MaxTime) or Config.MaxTime
 						self.currentTime = math.clamp(self.currentTime, nextStart, nextEnd)
 					else
-						self.currentTime = math.min(trackEnd, Config.MaxTime)
+						self:resetToTopPlaybackCamera()
 						self:pause()
 					end
 				end

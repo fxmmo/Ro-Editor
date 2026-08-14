@@ -1017,7 +1017,31 @@ function module:buildTimelinePanel()
 		ZIndex = 12,
 	})
 
-	self.timelineMinimizeButton = UIFactory.button({
+			self.trackPropertiesButton = UIFactory.button({
+			Parent = header,
+			Name = "TrackProperties",
+			Position = UDim2.new(0, 438, 0.5, -12),
+			Size = UDim2.new(0, 28, 0, 24),
+			Text = "",
+			Color = Theme.Panel,
+			Corner = 4,
+			TextSize = 16,
+			ZIndex = 13,
+		})
+		UIFactory.setIcon(self.trackPropertiesButton, Icons.Settings, {
+			IconOnly = true,
+			Color = Theme.TextDim,
+			Size = UDim2.new(0, 14, 0, 14),
+			Position = UDim2.new(0.5, -7, 0.5, -7),
+		})
+		self.trackPropertiesButton.MouseButton1Click:Connect(function()
+			if self.onTrackPropertiesButtonRequested then
+				self.onTrackPropertiesButtonRequested()
+			end
+		end)
+
+		self.timelineMinimizeButton = UIFactory.button({
+
 		Parent = header,
 		Name = "MinimizeTimeline",
 		Position = UDim2.new(1, -154, 0.5, -12),
@@ -1291,8 +1315,9 @@ function module:ensureTrack(cameraName)
 	row.ZIndex = 12
 		UIFactory.corner(row, 6)
 		local rowStroke = UIFactory.stroke(row, Theme.Border, 1, 0.5)
-		rowStroke.Transparency = 1
+		rowStroke.Enabled = false
 		local selectionStroke = UIFactory.stroke(row, trackColor, 2, 1)
+		selectionStroke.Enabled = false
 
 	local grad = Instance.new("UIGradient")
 	grad.Color = ColorSequence.new{
@@ -1432,9 +1457,6 @@ function module:ensureTrack(cameraName)
 			if self.onTrackSelected then
 				self.onTrackSelected(track.cameraName)
 			end
-			if self.onTrackPropertiesRequested then
-				self.onTrackPropertiesRequested(track.cameraName, rangeVisual.AbsolutePosition)
-			end
 		end)
 
 	self.tracks[cameraName] = track
@@ -1458,6 +1480,9 @@ function module:setActiveCamera(cameraName)
 		if tr.labelSurface then
 			tr.labelSurface.BackgroundColor3 = color:Lerp(Theme.PanelDark, highlight and 0.45 or 0.78)
 			tr.labelSurface.BackgroundTransparency = highlight and 0.1 or 0.4
+		end
+		if tr.selectionStroke then
+			tr.selectionStroke.Enabled = false
 		end
 		if tr.label then
 			tr.label.TextColor3 = highlight and Theme.Text or Theme.TextDim
