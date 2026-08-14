@@ -1265,6 +1265,12 @@ function module:beginTrackResize(cameraName, side, input)
 	end)
 end
 
+function module:getTrackColor(index)
+	local palette = Theme.TrackPalette
+	if not palette or #palette == 0 then return Theme.Accent end
+	return palette[(index - 1) % #palette + 1]
+end
+
 function module:ensureTrack(cameraName)
 	if self.tracks[cameraName] then return self.tracks[cameraName] end
 
@@ -1279,17 +1285,19 @@ function module:ensureTrack(cameraName)
 		self.trackOrder += 1
 		row.LayoutOrder = self.trackOrder
 
+	local trackColor = self:getTrackColor(self.trackOrder)
+
 	row.Parent = self.tracksList
 	row.ZIndex = 12
-		UIFactory.corner(row, 4)
+		UIFactory.corner(row, 6)
 		local rowStroke = UIFactory.stroke(row, Theme.Border, 1, 0.5)
 		rowStroke.Transparency = 1
-		local selectionStroke = UIFactory.stroke(row, Theme.Accent, 2.5, 1)
+		local selectionStroke = UIFactory.stroke(row, trackColor, 2, 1)
 
 	local grad = Instance.new("UIGradient")
 	grad.Color = ColorSequence.new{
-		ColorSequenceKeypoint.new(0, Theme.Panel),
-		ColorSequenceKeypoint.new(1, Theme.Panel:Lerp(Theme.Background, 0.3)),
+		ColorSequenceKeypoint.new(0, trackColor:Lerp(Theme.Panel, 0.45)),
+		ColorSequenceKeypoint.new(1, trackColor:Lerp(Theme.Background, 0.8)),
 	}
 	grad.Rotation = 90
 	grad.Parent = row
@@ -1311,7 +1319,7 @@ function module:ensureTrack(cameraName)
 		Text = cameraName,
 		Font = Enum.Font.GothamBold,
 		TextSize = 11,
-		Color = Theme.TextDim,
+		Color = Theme.Text,
 		ZIndex = 13,
 	})
 
@@ -1329,20 +1337,33 @@ function module:ensureTrack(cameraName)
 			Parent = kfContainer,
 			Size = UDim2.new(1, 0, 1, -4),
 			Position = UDim2.new(0, 0, 0, 0),
-			Color = Theme.Accent,
+			Color = trackColor,
 			Name = "TrackRange",
 			ZIndex = 13,
 		})
 		rangeVisual.Active = true
-				rangeVisual.BackgroundTransparency = 0.76
+				rangeVisual.BackgroundTransparency = 0.82
 
-		UIFactory.corner(rangeVisual, 3)
-		local rangeStroke = UIFactory.stroke(rangeVisual, Theme.Accent, 1.5, 0.35)
+		UIFactory.corner(rangeVisual, 6)
+		local rangeStroke = UIFactory.stroke(rangeVisual, trackColor, 1, 0.55)
 		grad.Parent = rangeVisual
+
+		local colorBar = UIFactory.frame({
+			Parent = rangeVisual,
+			Position = UDim2.new(0, 0, 0, 0),
+			Size = UDim2.new(0, 3, 1, 0),
+			Color = trackColor,
+			Name = "TrackColorBar",
+			ZIndex = 15,
+		})
+		colorBar.BackgroundTransparency = 0.15
+		UIFactory.corner(colorBar, 2)
+
 		labelSurface.Parent = rangeVisual
 		labelSurface.Position = UDim2.new(0, 8, 0, 3)
 		labelSurface.Size = UDim2.new(1, -16, 1, -6)
-		labelSurface.BackgroundTransparency = 0.24
+		labelSurface.BackgroundColor3 = trackColor:Lerp(Theme.PanelDark, 0.72)
+		labelSurface.BackgroundTransparency = 0.35
 		labelSurface.ZIndex = 14
 		label.Parent = labelSurface
 		label.Position = UDim2.new(0, 8, 0, 0)
@@ -1354,7 +1375,7 @@ function module:ensureTrack(cameraName)
 			handle.Name = side == "left" and "LeftResizeHandle" or "RightResizeHandle"
 			handle.Size = UDim2.new(0, TRACK_RESIZE_HANDLE_WIDTH, 1, 4)
 			handle.Position = UDim2.new(side == "left" and 0 or 1, -TRACK_RESIZE_HANDLE_WIDTH / 2, 0, -2)
-			handle.BackgroundColor3 = Theme.Accent
+			handle.BackgroundColor3 = trackColor
 			handle.BackgroundTransparency = 0.08
 			handle.BorderSizePixel = 0
 			handle.Active = true
@@ -1384,12 +1405,15 @@ function module:ensureTrack(cameraName)
 			selectionStroke = selectionStroke,
 			rangeVisual = rangeVisual,
 			rangeStroke = rangeStroke,
+			colorBar = colorBar,
+			color = trackColor,
 			leftResizeHandle = leftResizeHandle,
 			rightResizeHandle = rightResizeHandle,
 			startTime = 0,
 			endTime = getMaxTime(),
 
 	}
+
 			local function containsPoint(guiObject, point)
 			local origin = guiObject.AbsolutePosition
 			local size = guiObject.AbsoluteSize
@@ -1429,30 +1453,42 @@ function module:setActiveCamera(cameraName)
 	self.activeCameraName = cameraName
 	for name, tr in pairs(self.tracks) do
 		local highlight = (name == cameraName)
-						tr.row.BackgroundColor3 = Theme.Panel
-				if tr.labelSurface then
-					tr.labelSurface.BackgroundColor3 = highlight and Theme.Accent:Lerp(Theme.Panel, 0.25) or Theme.Panel
-				end
-
-			if tr.selectionStroke then
-				tr.selectionStroke.Transparency = 1
-			end
-			if tr.rangeStroke then
-				tr.rangeStroke.Transparency = highlight and 0 or 0.35
-			end
-			if tr.rangeVisual then
-				tr.rangeVisual.BackgroundTransparency = highlight and 0.72 or 0.88
-				tr.rangeVisual.BackgroundColor3 = highlight and Theme.Accent:Lerp(Theme.Panel, 0.35) or Theme.Panel
-			end
-			if tr.leftResizeHandle then
-				tr.leftResizeHandle.Visible = highlight
-			end
-			if tr.rightResizeHandle then
-				tr.rightResizeHandle.Visible = highlight
-			end
+		local color = tr.color or Theme.Accent
+		tr.row.BackgroundColor3 = Theme.Panel
+		if tr.labelSurface then
+			tr.labelSurface.BackgroundColor3 = color:Lerp(Theme.PanelDark, highlight and 0.45 or 0.78)
+			tr.labelSurface.BackgroundTransparency = highlight and 0.1 or 0.4
 		end
-
+		if tr.label then
+			tr.label.TextColor3 = highlight and Theme.Text or Theme.TextDim
+		end
+		if tr.colorBar then
+			tr.colorBar.Size = UDim2.new(0, highlight and 4 or 3, 1, 0)
+			tr.colorBar.BackgroundTransparency = highlight and 0 or 0.35
+		end
+		if tr.selectionStroke then
+			tr.selectionStroke.Color = color
+			tr.selectionStroke.Thickness = 2
+			tr.selectionStroke.Transparency = highlight and 0.15 or 1
+		end
+		if tr.rangeStroke then
+			tr.rangeStroke.Color = color
+			tr.rangeStroke.Thickness = highlight and 2 or 1
+			tr.rangeStroke.Transparency = highlight and 0 or 0.6
+		end
+		if tr.rangeVisual then
+			tr.rangeVisual.BackgroundColor3 = color
+			tr.rangeVisual.BackgroundTransparency = highlight and 0.7 or 0.86
+		end
+		if tr.leftResizeHandle then
+			tr.leftResizeHandle.Visible = highlight
+		end
+		if tr.rightResizeHandle then
+			tr.rightResizeHandle.Visible = highlight
+		end
+	end
 end
+
 
 function module:removeTrack(cameraName)
 	if self.trackPropertiesCameraName == cameraName then
