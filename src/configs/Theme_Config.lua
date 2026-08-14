@@ -20,7 +20,18 @@ module.Theme = {
 	AxisX = Color3.fromRGB(255, 82, 82),
 	AxisY = Color3.fromRGB(105, 235, 110),
 	AxisZ = Color3.fromRGB(82, 145, 255),
+	TrackPalette = {
+		Color3.fromRGB(0, 162, 255),
+		Color3.fromRGB(120, 200, 90),
+		Color3.fromRGB(255, 160, 60),
+		Color3.fromRGB(200, 110, 235),
+		Color3.fromRGB(240, 95, 120),
+		Color3.fromRGB(60, 210, 200),
+		Color3.fromRGB(235, 205, 70),
+		Color3.fromRGB(130, 140, 250),
+	},
 }
+
 
 module.Config = {
 	MaxTime = 10,
