@@ -1051,8 +1051,9 @@ function module:buildTimelinePanel()
 
 	self.tracksList = Instance.new("ScrollingFrame")
 	self.tracksList.Name = "TracksList"
-	self.tracksList.Size = UDim2.new(1, -16, 1, -28)
-	self.tracksList.Position = UDim2.new(0, 8, 0, 26)
+			self.tracksList.Size = UDim2.new(1, 0, 1, -28)
+		self.tracksList.Position = UDim2.new(0, 0, 0, 26)
+
 	self.tracksList.BackgroundTransparency = 1
 	self.tracksList.BorderSizePixel = 0
 	self.tracksList.ScrollBarThickness = 4
@@ -1198,8 +1199,8 @@ function module:setTrackRange(cameraName, startTime, endTime)
 	track.startTime = start
 	track.endTime = finish
 	if track.rangeVisual and track.rangeVisual.Parent then
-		track.rangeVisual.Position = UDim2.new(start / maxTime, 0, 0, 2)
-		track.rangeVisual.Size = UDim2.new((finish - start) / maxTime, 0, 1, -4)
+		track.rangeVisual.Position = UDim2.new(start / maxTime, 0, 0, 0)
+		track.rangeVisual.Size = UDim2.new((finish - start) / maxTime, 0, 1, 0)
 	end
 	if track.leftResizeHandle and track.leftResizeHandle.Parent then
 		track.leftResizeHandle.Position = UDim2.new(start / maxTime, -TRACK_RESIZE_HANDLE_WIDTH / 2, 0, -2)
@@ -1269,7 +1270,8 @@ function module:ensureTrack(cameraName)
 
 	local row = Instance.new("Frame")
 	row.Name = "Track_" .. cameraName
-	row.Size = UDim2.new(1, -8, 0, 36)
+			row.Size = UDim2.new(1, 0, 0, 36)
+
 	row.BackgroundColor3 = Theme.Panel
 	row.BackgroundTransparency = 1
 	row.BorderSizePixel = 0
@@ -1279,9 +1281,10 @@ function module:ensureTrack(cameraName)
 
 	row.Parent = self.tracksList
 	row.ZIndex = 12
-	UIFactory.corner(row, 4)
-	UIFactory.stroke(row, Theme.Border, 1, 0.5)
-	local selectionStroke = UIFactory.stroke(row, Theme.Accent, 2.5, 1)
+		UIFactory.corner(row, 4)
+		local rowStroke = UIFactory.stroke(row, Theme.Border, 1, 0.5)
+		rowStroke.Transparency = 1
+		local selectionStroke = UIFactory.stroke(row, Theme.Accent, 2.5, 1)
 
 	local grad = Instance.new("UIGradient")
 	grad.Color = ColorSequence.new{
@@ -1314,8 +1317,9 @@ function module:ensureTrack(cameraName)
 
 	local kfContainer = Instance.new("Frame")
 	kfContainer.Name = "Keyframes"
-	kfContainer.Size = UDim2.new(1, -KF_LABEL_OFFSET - 10, 1, 0)
-	kfContainer.Position = UDim2.new(0, KF_LABEL_OFFSET, 0, 0)
+			kfContainer.Size = UDim2.new(1, 0, 1, 0)
+		kfContainer.Position = UDim2.new(0, 0, 0, 0)
+
 	kfContainer.BackgroundTransparency = 1
 	kfContainer.ClipsDescendants = false
 	kfContainer.Parent = row
@@ -1324,11 +1328,12 @@ function module:ensureTrack(cameraName)
 		local rangeVisual = UIFactory.frame({
 			Parent = kfContainer,
 			Size = UDim2.new(1, 0, 1, -4),
-			Position = UDim2.new(0, 0, 0, 2),
+			Position = UDim2.new(0, 0, 0, 0),
 			Color = Theme.Accent,
 			Name = "TrackRange",
 			ZIndex = 13,
 		})
+		rangeVisual.Active = true
 				rangeVisual.BackgroundTransparency = 0.76
 
 		UIFactory.corner(rangeVisual, 3)
@@ -1336,7 +1341,7 @@ function module:ensureTrack(cameraName)
 		grad.Parent = rangeVisual
 		labelSurface.Parent = rangeVisual
 		labelSurface.Position = UDim2.new(0, 8, 0, 3)
-		labelSurface.Size = UDim2.new(0, 112, 1, -6)
+		labelSurface.Size = UDim2.new(1, -16, 1, -6)
 		labelSurface.BackgroundTransparency = 0.24
 		labelSurface.ZIndex = 14
 		label.Parent = labelSurface
@@ -1385,19 +1390,29 @@ function module:ensureTrack(cameraName)
 			endTime = getMaxTime(),
 
 	}
-	row.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			local function containsPoint(guiObject, point)
+			local origin = guiObject.AbsolutePosition
+			local size = guiObject.AbsoluteSize
+			return point.X >= origin.X and point.X <= origin.X + size.X and point.Y >= origin.Y and point.Y <= origin.Y + size.Y
+		end
+		rangeVisual.InputBegan:Connect(function(input)
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
 			local position = input.Position
-			if position.X < kfContainer.AbsolutePosition.X then
-				if self.onTrackSelected then
-					self.onTrackSelected(track.cameraName)
-				end
-				if self.onTrackPropertiesRequested then
-					self.onTrackPropertiesRequested(track.cameraName, row.AbsolutePosition)
+			if not containsPoint(rangeVisual, position) then return end
+			if containsPoint(leftResizeHandle, position) or containsPoint(rightResizeHandle, position) then return end
+			for _, keyframe in ipairs(track.keyframes) do
+				if keyframe.frame and keyframe.frame.Parent and containsPoint(keyframe.frame, position) then
+					return
 				end
 			end
-		end
-	end)
+			if self.onTrackSelected then
+				self.onTrackSelected(track.cameraName)
+			end
+			if self.onTrackPropertiesRequested then
+				self.onTrackPropertiesRequested(track.cameraName, rangeVisual.AbsolutePosition)
+			end
+		end)
+
 	self.tracks[cameraName] = track
 	self:setTrackRange(cameraName, 0, getMaxTime())
 		self:refreshTimelineAxis()
