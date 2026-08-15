@@ -120,9 +120,9 @@ function module.new(interface, store, handles)
 			self:applyTrackRange(cameraName, startTime, endTime)
 		end
 
-	self.handles.onChanged = function()
-		self:updateSelectedKeyframe()
-	end
+		self.handles.onChanged = function(target, cframe, size)
+			self:updateSelectedKeyframe(target, cframe, size)
+		end
 	self.handles.onDragStateChanged = function(dragging)
 		self:_setPlayerCameraLocked(dragging)
 	end
@@ -198,6 +198,16 @@ function module:setTargetCFrame(target, cframe)
 		part.CFrame = cframe
 	else
 		CameraResolver.setCFrame(target, cframe)
+	end
+end
+
+function module:applyTargetState(target, cframe, size, color, transparency)
+	if not target or not target.part or not target.part.Parent then return end
+	self:setTargetCFrame(target, cframe)
+	if target.object or self:isObjectTrack(target.name) then
+		if size then target.part.Size = size end
+		if color then target.part.Color = color end
+		if transparency ~= nil then target.part.Transparency = math.clamp(transparency, 0, 1) end
 	end
 end
 
@@ -340,25 +350,18 @@ function module:renameCamera(oldName, newName)
 end
 
 function module:setupModeButtons()
-	self.ui.editButton.MouseButton1Click:Connect(function()
-		local open = self.ui:toggleEditSection()
-		if not open then
-			self:setEditMode(nil)
+		self.ui.onEditToolSelected = function(mode)
+			self:setEditMode(mode)
 		end
-	end)
-	self.ui.onEditToolSelected = function(mode)
-		self:setEditMode(mode)
-		self.ui:closeCamerasModal()
-	end
 	self.ui.addCamButton.MouseButton1Click:Connect(function()
 		self:addCamera()
 		self.ui:closeCamerasModal()
 	end)
-	self.ui.deleteCamButton.MouseButton1Click:Connect(function()
-		if self:deleteCamera() then
-			self.ui:closeCamerasModal()
-		end
-	end)
+		self.ui.deleteTrackButton.MouseButton1Click:Connect(function()
+			if self:deleteTrack() then
+				self.ui:closeCamerasModal()
+			end
+		end)
 	self.ui:setViewToggle(false, function(on)
 		self.cameraMode = on and true or false
 		self:_applyCameraMode()
@@ -496,11 +499,12 @@ function module:selectCamera(cameraName, preserveProperties)
 	end
 end
 
-function module:deleteCamera()
-	local cameraName = self.lastCam and self.lastCam.name
-	if not cameraName or not CameraResolver.get(cameraName) then
-		return false
-	end
+function module:deleteTrack()
+		local cameraName = self.lastCam and self.lastCam.name
+		if not cameraName or not self:targetFor(cameraName) then
+			return false
+		end
+		local objectTrack = self:isObjectTrack(cameraName)
 	self:_setPlayerCameraLocked(false)
 	self.editMode = false
 	self.editTool = "move"
@@ -512,16 +516,21 @@ function module:deleteCamera()
 		self:_restorePlayerCamera()
 	end
 	self.storeByCamera[cameraName] = nil
-	self.visuals:removeCamera(cameraName)
-	self.ui:removeTrack(cameraName)
-	CameraResolver.destroy(cameraName)
+		if objectTrack then
+			self.objectTargets[cameraName] = nil
+			self.visuals:removePath(cameraName)
+		else
+			self.visuals:removeCamera(cameraName)
+			CameraResolver.destroy(cameraName)
+		end
+		self.ui:removeTrack(cameraName)
 	self.lastCam = nil
 	self.currentTime = 0
 	self.isPlaying = false
 	self:_updatePlaybackButton()
 	self.ui:clearKeyframeProperties()
-	self.ui:setEditSectionVisible(false)
-	self:updatePlayhead()
+		self.ui:closeEditModal()
+		self:updatePlayhead()
 	self:updateTimeLabel()
 	self:_refreshTimelineHeight()
 	return true
@@ -538,8 +547,13 @@ function module:setEditMode(mode)
 	end
 	self.objectSelectionMode = false
 	local target = self:activeTarget()
-	local enabled = mode == "move" or mode == "rotate"
-	if enabled and not target then
+		local enabled = mode == "move" or mode == "rotate" or mode == "scale"
+		if mode == "scale" and (not target or not target.object) then
+			self.editMode = false
+			self.handles:show(false)
+			return
+		end
+		if enabled and not target then
 		self.editMode = false
 		self.handles:show(false)
 		return
@@ -757,14 +771,19 @@ function module:addKeyframe()
 		end
 	end
 
-	local data = {
-		time = time,
-		position = entry.part.Position,
-		orientation = entry.part.Orientation,
-		cframe = entry.part.CFrame,
-		cameraName = camName,
-		easing = (store.metadata and store.metadata.easing) or "EaseInOut",
-	}
+	local isObject = entry.object == true
+		local data = {
+			time = time,
+			position = entry.part.Position,
+			orientation = entry.part.Orientation,
+			cframe = entry.part.CFrame,
+			cameraName = camName,
+			object = isObject,
+			size = isObject and entry.part.Size or nil,
+			color = isObject and entry.part.Color or nil,
+			transparency = isObject and entry.part.Transparency or nil,
+			easing = (store.metadata and store.metadata.easing) or "EaseInOut",
+		}
 	store:add(data)
 	store:setSelected(data)
 	self.ui:setKeyframeProperties(data)
@@ -777,18 +796,24 @@ function module:addKeyframe()
 	task.delay(0.2, function() self.addBtn.BackgroundColor3 = Theme.Panel end)
 end
 
-function module:updateSelectedKeyframe()
-	local entry = self:activeTarget()
-	if not entry or not entry.part or not self.lastCam then return end
-	local store = self:storeFor(self.lastCam.name)
-	local selected = store:getSelected()
-	if not selected then return end
-	selected.cframe = entry.part.CFrame
-	selected.position = entry.part.Position
-	selected.orientation = entry.part.Orientation
-	self.visuals:updateKeyframe(self.lastCam.name, selected)
-	self.ui:setKeyframeProperties(selected)
-end
+function module:updateSelectedKeyframe(target, cframe, size)
+		local entry = self:activeTarget()
+		if not entry or not entry.part or not self.lastCam then return end
+		local store = self:storeFor(self.lastCam.name)
+		local selected = store:getSelected()
+		if not selected then return end
+		selected.cframe = cframe or entry.part.CFrame
+		selected.position = entry.part.Position
+		selected.orientation = entry.part.Orientation
+		if entry.object then
+			selected.object = true
+			selected.size = size or entry.part.Size
+			selected.color = entry.part.Color
+			selected.transparency = entry.part.Transparency
+		end
+		self.visuals:updateKeyframe(self.lastCam.name, selected)
+		self.ui:setKeyframeProperties(selected)
+	end
 
 function module:applySelectedKeyframeProperties(values)
 	if not values then return end
@@ -804,10 +829,29 @@ function module:applySelectedKeyframeProperties(values)
 		math.rad(orientation.Y),
 		math.rad(orientation.Z)
 	)
-	self:setTargetCFrame(entry, cframe)
+	local size = selected.size
+	local color = selected.color
+	local transparency = selected.transparency
+	if entry.object then
+		if values.sizeX and values.sizeY and values.sizeZ then
+			size = Vector3.new(math.max(0.05, values.sizeX), math.max(0.05, values.sizeY), math.max(0.05, values.sizeZ))
+		end
+		if values.colorR and values.colorG and values.colorB then
+			color = Color3.fromRGB(math.clamp(values.colorR, 0, 255), math.clamp(values.colorG, 0, 255), math.clamp(values.colorB, 0, 255))
+		end
+		if values.transparency ~= nil then
+			transparency = math.clamp(values.transparency, 0, 1)
+		end
+	end
+	self:applyTargetState(entry, cframe, size, color, transparency)
 	selected.position = position
 	selected.orientation = orientation
 	selected.cframe = cframe
+	if entry.object then
+		selected.size = size
+		selected.color = color
+		selected.transparency = transparency
+	end
 	if values.easing then
 		selected.easing = values.easing
 	end
@@ -1064,20 +1108,25 @@ function module:updateCameraByTime()
 
 				local prevKf, nextKf = store:findNeighbors(self.currentTime)
 
-		if prevKf and nextKf then
-			local span = nextKf.time - prevKf.time
-			local alpha = span > 0 and (self.currentTime - prevKf.time) / span or 0
-			alpha = math.clamp(alpha, 0, 1)
-			local easing = easingFunctions[prevKf.easing or (store.metadata and store.metadata.easing) or "EaseInOut"] or easingFunctions.EaseInOut
-			alpha = easing(alpha)
-							self:setTargetCFrame(entry, prevKf.cframe:Lerp(nextKf.cframe, alpha))
-
-		elseif prevKf then
-			self:setTargetCFrame(entry, prevKf.cframe)
-		elseif nextKf then
-			self:setTargetCFrame(entry, nextKf.cframe)
-
-	end
+			if prevKf and nextKf then
+				local span = nextKf.time - prevKf.time
+				local alpha = span > 0 and (self.currentTime - prevKf.time) / span or 0
+				alpha = math.clamp(alpha, 0, 1)
+				local easing = easingFunctions[prevKf.easing or (store.metadata and store.metadata.easing) or "EaseInOut"] or easingFunctions.EaseInOut
+				alpha = easing(alpha)
+				local cframe = prevKf.cframe:Lerp(nextKf.cframe, alpha)
+				local size = prevKf.size and nextKf.size and prevKf.size:Lerp(nextKf.size, alpha) or nil
+				local color = prevKf.color and nextKf.color and prevKf.color:Lerp(nextKf.color, alpha) or nil
+				local transparency = nil
+				if prevKf.transparency ~= nil and nextKf.transparency ~= nil then
+					transparency = prevKf.transparency + (nextKf.transparency - prevKf.transparency) * alpha
+				end
+				self:applyTargetState(entry, cframe, size, color, transparency)
+			elseif prevKf then
+				self:applyTargetState(entry, prevKf.cframe, prevKf.size, prevKf.color, prevKf.transparency)
+			elseif nextKf then
+				self:applyTargetState(entry, nextKf.cframe, nextKf.size, nextKf.color, nextKf.transparency)
+			end
 end
 
 function module:updateTimeLabel()

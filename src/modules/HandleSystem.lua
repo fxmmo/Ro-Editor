@@ -62,15 +62,17 @@ local AXIS_VECTORS = {
 function module.new()
 	local self = setmetatable({}, module)
 	self.handles = {}
-	self.arcHandles = nil
-	self.connections = {}
-	self.selectedTarget = nil
-	self.dragStartCFrame = nil
-	self.dragFace = nil
-	self.dragAxis = nil
-	self.isDragging = false
-	self.visible = false
-	self.mode = "move"
+		self.arcHandles = nil
+		self.scaleHandles = nil
+		self.connections = {}
+		self.selectedTarget = nil
+		self.dragStartCFrame = nil
+		self.dragStartSize = nil
+		self.dragFace = nil
+		self.dragAxis = nil
+		self.isDragging = false
+		self.visible = false
+		self.mode = "move"
 	self.onChanged = nil
 	self.onDragStateChanged = nil
 	self:build()
@@ -155,10 +157,54 @@ function module:build()
 		self:stopDrag()
 	end)
 	self.arcHandles = arcHandles
+	local scaleHandles = Instance.new("Handles")
+	scaleHandles.Name = "BasePartScaleHandles"
+	scaleHandles.Style = Enum.HandlesStyle.Resize
+	scaleHandles.Color3 = Theme.Warning or Color3.fromRGB(255, 188, 66)
+	scaleHandles.Transparency = 0
+	scaleHandles.Faces = Faces.new(Enum.NormalId.Left, Enum.NormalId.Right, Enum.NormalId.Bottom, Enum.NormalId.Top, Enum.NormalId.Back, Enum.NormalId.Front)
+	self.connections[#self.connections + 1] = scaleHandles.MouseButton1Down:Connect(function(face)
+		if not self.visible or self.mode ~= "scale" or not self.selectedTarget or not self.selectedTarget.Parent then return end
+		self.dragFace = face
+		self.dragStartSize = self.selectedTarget.Size
+		self:_setDragging(true)
+	end)
+	self.connections[#self.connections + 1] = scaleHandles.MouseDrag:Connect(function(face, distance)
+		if not self.isDragging or self.mode ~= "scale" or face ~= self.dragFace then return end
+		if not self.selectedTarget or not self.selectedTarget.Parent or not self.dragStartSize then
+			self:stopDrag()
+			return
+		end
+		local axis = FACE_DIRECTIONS[face]
+		if not axis then return end
+		local size = self.dragStartSize
+		local delta = distance * 2
+		if axis.X ~= 0 then
+			size = Vector3.new(math.max(0.1, self.dragStartSize.X + delta), size.Y, size.Z)
+		elseif axis.Y ~= 0 then
+			size = Vector3.new(size.X, math.max(0.1, self.dragStartSize.Y + delta), size.Z)
+		elseif axis.Z ~= 0 then
+			size = Vector3.new(size.X, size.Y, math.max(0.1, self.dragStartSize.Z + delta))
+		end
+		self.selectedTarget.Size = size
+		if self.onChanged then
+			self.onChanged(self.selectedTarget, self.selectedTarget.CFrame, size)
+		end
+	end)
+	self.connections[#self.connections + 1] = scaleHandles.MouseButton1Up:Connect(function()
+		self:stopDrag()
+	end)
+	self.scaleHandles = scaleHandles
 end
 
 function module:setMode(mode)
-	self.mode = mode == "rotate" and "rotate" or "move"
+	if mode == "rotate" then
+		self.mode = "rotate"
+	elseif mode == "scale" then
+		self.mode = "scale"
+	else
+		self.mode = "move"
+	end
 	if self.isDragging then
 		self:stopDrag()
 	end
@@ -170,9 +216,12 @@ function module:setTarget(target)
 	for _, handle in ipairs(self.handles) do
 		handle.Adornee = target
 	end
-	if self.arcHandles then
-		self.arcHandles.Adornee = target
-	end
+		if self.arcHandles then
+			self.arcHandles.Adornee = target
+		end
+		if self.scaleHandles then
+			self.scaleHandles.Adornee = target
+		end
 	if not target then
 		self:show(false)
 	else
@@ -185,9 +234,12 @@ function module:_updateParents()
 	for _, handle in ipairs(self.handles) do
 		handle.Parent = self.mode == "move" and parent or nil
 	end
-	if self.arcHandles then
-		self.arcHandles.Parent = self.mode == "rotate" and parent or nil
-	end
+		if self.arcHandles then
+			self.arcHandles.Parent = self.mode == "rotate" and parent or nil
+		end
+		if self.scaleHandles then
+			self.scaleHandles.Parent = self.mode == "scale" and parent or nil
+		end
 end
 
 function module:show(visible)
@@ -218,9 +270,10 @@ end
 
 function module:stopDrag()
 	self.dragFace = nil
-	self.dragAxis = nil
-	self.dragStartCFrame = nil
-	self:_setDragging(false)
+		self.dragAxis = nil
+		self.dragStartCFrame = nil
+		self.dragStartSize = nil
+		self:_setDragging(false)
 end
 
 function module:destroy()
@@ -232,10 +285,14 @@ function module:destroy()
 		handle:Destroy()
 	end
 	self.handles = {}
-	if self.arcHandles then
-		self.arcHandles:Destroy()
-		self.arcHandles = nil
-	end
+		if self.arcHandles then
+			self.arcHandles:Destroy()
+			self.arcHandles = nil
+		end
+		if self.scaleHandles then
+			self.scaleHandles:Destroy()
+			self.scaleHandles = nil
+		end
 end
 
 return module
