@@ -180,7 +180,33 @@ function module:buildTopBar()
 		ZIndex = 11,
 	})
 
-	self.camerasButton = UIFactory.button({
+	self.topbarEditToolButtons = {}
+	local function topbarEditToolButton(name, text, x, mode, icon)
+		local button = UIFactory.button({
+			Parent = bar,
+			Name = name,
+			Position = UDim2.new(0, x, 0.5, -13),
+			Size = UDim2.new(0, 86, 0, 26),
+			Text = text,
+			Color = Theme.Panel,
+			Corner = 4,
+			TextSize = 10,
+			ZIndex = 11,
+		})
+		UIFactory.setIcon(button, icon, {Color = Theme.TextDim, TextOffset = 18})
+		button.MouseButton1Click:Connect(function()
+			self:setEditTool(mode)
+			if self.onEditToolSelected then
+				self.onEditToolSelected(mode)
+			end
+		end)
+		self.topbarEditToolButtons[mode] = button
+	end
+		topbarEditToolButton("MoveTool", "MOVE", 246, "move", Icons.Move3D)
+		topbarEditToolButton("RotateTool", "ROTATE", 338, "rotate", Icons.Rotate3D)
+		topbarEditToolButton("SelectTool", "SELECT", 430, "select", Icons.Scan)
+
+		self.camerasButton = UIFactory.button({
 		Parent = bar,
 		Position = UDim2.new(1, -150, 0.5, -13),
 		Size = UDim2.new(0, 130, 0, 26),
@@ -412,6 +438,7 @@ function module:buildCamerasModal()
 	editToolButton("RotateCamera", "ROTATE CAMERA", 48, "rotate")
 	self.editSection = editSection
 	editSection.Visible = false
+	self.editButton.Visible = false
 	local separator = Instance.new("Frame")
 	separator.Size = UDim2.new(1, -24, 0, 1)
 	separator.Position = UDim2.new(0, 12, 0, 158)
@@ -637,8 +664,9 @@ function module:clearKeyframeProperties()
 end
 
 function module:setEditTool(mode)
-	if not self.editToolButtons then return end
-		for buttonMode, button in pairs(self.editToolButtons) do
+	local function updateButtons(buttons)
+		if not buttons then return end
+		for buttonMode, button in pairs(buttons) do
 			local active = buttonMode == mode
 			button.BackgroundColor3 = active and Theme.Accent or Theme.Panel
 			button.TextColor3 = active and Theme.Text or Theme.TextDim
@@ -651,6 +679,9 @@ function module:setEditTool(mode)
 				icon.ImageColor3 = active and Theme.Text or Theme.TextDim
 			end
 		end
+	end
+	updateButtons(self.editToolButtons)
+	updateButtons(self.topbarEditToolButtons)
 	self.activeEditTool = mode
 end
 

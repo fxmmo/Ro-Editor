@@ -55,8 +55,10 @@ function module.new(interface, store, handles)
 	self.isDraggingKeyframe = false
 	self.editMode = false
 	self.editTool = "move"
+	self.objectSelectionMode = false
 	self.cameraMode = false
 	self.lastCam = nil
+	self.objectTargets = {}
 	self.playerCamera = workspace.CurrentCamera
 	self.cameraLock = nil
 	self.tweenConnection = nil
@@ -64,7 +66,7 @@ function module.new(interface, store, handles)
 	self.storeByCamera = {}
 	self.connections = {}
 	self.ui.onTrackSelected = function(cameraName)
-		self:selectCamera(cameraName)
+		self:selectTrack(cameraName)
 	end
 	self.ui.onKeyframeSelected = function(cameraName, data)
 		self:selectKeyframe(cameraName, data)
@@ -91,7 +93,7 @@ function module.new(interface, store, handles)
 		self:nextKeyframe()
 	end
 			self.ui.onTrackPropertiesRequested = function(cameraName)
-			self:selectCamera(cameraName)
+			self:selectTrack(cameraName)
 		end
 		self.ui.onTrackPropertiesButtonRequested = function()
 			if not self.lastCam then return end
@@ -105,9 +107,10 @@ function module.new(interface, store, handles)
 			self.ui.onTrackPropertiesSubmitted = function(cameraName, values)
 			self:applyTrackProperties(cameraName, values)
 		end
-		self.ui.onTrackResizeStarted = function(cameraName)
+					self.ui.onTrackResizeStarted = function(cameraName)
 			self.isDraggingPlayhead = false
-			self:selectCamera(cameraName, true)
+			self:selectTrack(cameraName, true)
+
 			self:pause()
 		end
 		self.ui.onTrackResized = function(cameraName, startTime, endTime)
@@ -127,6 +130,7 @@ function module.new(interface, store, handles)
 	self:setupButtons()
 	self:setupTimelineInput()
 	self:setupModeButtons()
+	self:setupObjectSelection()
 	self.connections.CharacterAdded = Players.LocalPlayer.CharacterAdded:Connect(function(character)
 		task.defer(function()
 			Players.LocalPlayer:WaitForChild("PlayerGui", 5)
@@ -141,8 +145,9 @@ function module.new(interface, store, handles)
 				self:_restorePlayerCamera()
 			end
 			self.ui:setEditTool(self.editTool)
-			local entry = self:activeCam()
-			if self.editMode and entry then
+							local entry = self:activeTarget()
+				if self.editMode and entry then
+
 				self.handles:setMode(self.editTool)
 				self.handles:setTarget(entry.part)
 				self.handles:show(true)
@@ -158,6 +163,42 @@ end
 function module:activeCam()
 	if not self.lastCam or not self.lastCam.name then return nil end
 	return CameraResolver.get(self.lastCam.name)
+end
+
+function module:targetFor(name)
+	if not name then return nil end
+	local entry = CameraResolver.get(name)
+	if entry and entry.part then return entry end
+	local part = self.objectTargets[name]
+	if part and part.Parent then
+		return {name = name, part = part, object = true}
+	end
+	return nil
+end
+
+function module:activeTarget()
+	return self.lastCam and self:targetFor(self.lastCam.name) or nil
+end
+
+function module:isObjectTrack(name)
+	return name and self.objectTargets[name] ~= nil
+end
+
+function module:getTargetCFrame(target)
+	if not target then return nil end
+	local part = target.part or target
+	return part and part.CFrame or nil
+end
+
+function module:setTargetCFrame(target, cframe)
+	if not target or not cframe then return end
+	local part = target.part or target
+	if not part or not part.Parent then return end
+	if target.object or self:isObjectTrack(target.name) then
+		part.CFrame = cframe
+	else
+		CameraResolver.setCFrame(target, cframe)
+	end
 end
 
 function module:storeFor(cameraName)
@@ -208,18 +249,39 @@ function module:storeFor(cameraName)
 	function module:applyTrackProperties(cameraName, values)
 
 	if not cameraName or not values then return end
-	local entry = CameraResolver.get(cameraName)
-	if not entry then return end
+	local target = self:targetFor(cameraName)
+	if not target then return end
 	local store = self:storeFor(cameraName)
 	store.metadata.speedMultiplier = values.speedMultiplier
 	store.metadata.easing = values.easing or store.metadata.easing or "EaseInOut"
 	local newName = values.name
 	if newName ~= cameraName then
-		local renamed = self:renameCamera(cameraName, newName)
+		local renamed = self:isObjectTrack(cameraName) and self:renameObjectTrack(cameraName, newName) or self:renameCamera(cameraName, newName)
 		if not renamed then return end
 		cameraName = newName
 	end
 	self.ui:closeTrackProperties()
+end
+
+function module:renameObjectTrack(oldName, newName)
+	if not oldName or not newName or newName == "" or oldName == newName then return self:targetFor(oldName) end
+	if self.ui.tracks[newName] or CameraResolver.get(newName) or self.objectTargets[newName] then return nil end
+	local part = self.objectTargets[oldName]
+	if not part or not part.Parent then return nil end
+	local store = self.storeByCamera[oldName]
+	self.objectTargets[oldName] = nil
+	self.objectTargets[newName] = part
+	self.storeByCamera[oldName] = nil
+	if store then
+		self.storeByCamera[newName] = store
+		for _, keyframe in ipairs(store.keyframes) do
+			keyframe.cameraName = newName
+		end
+	end
+	self.visuals:renameCamera(oldName, newName)
+	self.ui:updateTrackName(oldName, newName)
+	self.lastCam = {name = newName, part = part, object = true}
+	return self.lastCam
 end
 
 function module:renameCamera(oldName, newName)
@@ -313,6 +375,66 @@ function module:setupModeButtons()
 	end)
 end
 
+function module:setupObjectSelection()
+	self.connections.ObjectSelection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if gameProcessed or not self.objectSelectionMode then return end
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+		local camera = workspace.CurrentCamera
+		if not camera then return end
+		local position = input.Position
+		local ray = camera:ViewportPointToRay(position.X, position.Y)
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local exclusions = {}
+		local character = Players.LocalPlayer.Character
+		if character then
+			table.insert(exclusions, character)
+		end
+		local camsFolder = workspace:FindFirstChild("cams_folder")
+		if camsFolder then
+			table.insert(exclusions, camsFolder)
+		end
+		if self.visuals and self.visuals.folder then
+			table.insert(exclusions, self.visuals.folder)
+		end
+		params.FilterDescendantsInstances = exclusions
+		local result = workspace:Raycast(ray.Origin, ray.Direction * 2000, params)
+		local part = result and result.Instance
+		if part and part:IsA("BasePart") then
+			self:selectMapPart(part)
+		end
+	end)
+end
+
+function module:selectMapPart(part)
+	if not part or not part:IsA("BasePart") or not part.Parent then return nil end
+	if self.visuals and self.visuals.folder and part:IsDescendantOf(self.visuals.folder) then return nil end
+	local camsFolder = workspace:FindFirstChild("cams_folder")
+	if camsFolder and part:IsDescendantOf(camsFolder) then return nil end
+	local name = part.Name
+	if name == "" then name = "Part" end
+	local baseName = name
+	local suffix = 1
+	while self.ui.tracks[name] and self.objectTargets[name] ~= part do
+		suffix += 1
+		name = baseName .. "_" .. suffix
+	end
+	if not self.objectTargets[name] then
+		self.objectTargets[name] = part
+		self:storeFor(name)
+		self.ui:ensureTrack(name)
+		local store = self:storeFor(name)
+		self.ui:setTrackRange(name, store.metadata.startTime, store.metadata.endTime)
+	end
+	self.lastCam = {name = name, part = part, object = true}
+	self.ui:setActiveCamera(name)
+	self.ui:clearKeyframeProperties()
+	self.objectSelectionMode = false
+	self:setEditMode("move")
+	self:_refreshTimelineHeight()
+	return self.lastCam
+end
+
 function module:addCamera()
 	local name
 	repeat
@@ -349,21 +471,28 @@ function module:addCamera()
 	self:_refreshTimelineHeight()
 end
 
-function module:selectCamera(cameraName, preserveProperties)
-	local entry = CameraResolver.get(cameraName)
-	if not entry then return end
-	self.lastCam = entry
-	self.ui:setActiveCamera(cameraName)
+function module:selectTrack(name, preserveProperties)
+	local target = self:targetFor(name)
+	if not target then return end
+	self.lastCam = target
+	self.objectSelectionMode = false
+	self.ui:setActiveCamera(name)
 	if not preserveProperties then
 		self.ui:clearKeyframeProperties()
 	end
 	if self.editMode then
 		self.handles:setMode(self.editTool)
-		self.handles:setTarget(entry.part)
+		self.handles:setTarget(target.part)
 		self.handles:show(true)
 	end
-	if self.cameraMode then
+	if self.cameraMode and not target.object then
 		self:_applyCameraMode()
+	end
+end
+
+function module:selectCamera(cameraName, preserveProperties)
+	if CameraResolver.get(cameraName) then
+		self:selectTrack(cameraName, preserveProperties)
 	end
 end
 
@@ -399,9 +528,18 @@ function module:deleteCamera()
 end
 
 function module:setEditMode(mode)
-	local entry = self:activeCam()
+	if mode == "select" then
+		self.objectSelectionMode = true
+		self.editMode = false
+		self:_setPlayerCameraLocked(false)
+		self.handles:show(false)
+		self.ui:setEditTool("select")
+		return
+	end
+	self.objectSelectionMode = false
+	local target = self:activeTarget()
 	local enabled = mode == "move" or mode == "rotate"
-	if enabled and not entry then
+	if enabled and not target then
 		self.editMode = false
 		self.handles:show(false)
 		return
@@ -415,11 +553,12 @@ function module:setEditMode(mode)
 	self.editTool = enabled and mode or "move"
 	if not enabled then
 		self.handles:show(false)
+		self.ui:setEditTool("move")
 		return
 	end
 	self.ui:setEditTool(self.editTool)
 	self.handles:setMode(self.editTool)
-	self.handles:setTarget(entry.part)
+	self.handles:setTarget(target.part)
 	self.handles:show(true)
 end
 
@@ -572,7 +711,8 @@ end
 			local nextCamera = self:findNextPlaybackCamera()
 						if nextCamera then
 				local nextTrack = self.ui.tracks[nextCamera]
-				self:selectCamera(nextCamera, true)
+									self:selectTrack(nextCamera, true)
+
 				local nextStart = nextTrack and (nextTrack.startTime or 0) or 0
 				local nextEnd = nextTrack and (nextTrack.endTime or Config.MaxTime) or Config.MaxTime
 				self.currentTime = math.clamp(self.currentTime, nextStart, nextEnd)
@@ -602,7 +742,7 @@ function module:stop()
 end
 
 function module:addKeyframe()
-	local entry = self:activeCam()
+	local entry = self:activeTarget()
 	if not entry or not entry.part then return end
 
 	local time = self.currentTime
@@ -638,7 +778,7 @@ function module:addKeyframe()
 end
 
 function module:updateSelectedKeyframe()
-	local entry = self:activeCam()
+	local entry = self:activeTarget()
 	if not entry or not entry.part or not self.lastCam then return end
 	local store = self:storeFor(self.lastCam.name)
 	local selected = store:getSelected()
@@ -652,7 +792,7 @@ end
 
 function module:applySelectedKeyframeProperties(values)
 	if not values then return end
-	local entry = self:activeCam()
+	local entry = self:activeTarget()
 	if not entry or not entry.part or not self.lastCam then return end
 	local store = self:storeFor(self.lastCam.name)
 	local selected = store:getSelected()
@@ -664,7 +804,7 @@ function module:applySelectedKeyframeProperties(values)
 		math.rad(orientation.Y),
 		math.rad(orientation.Z)
 	)
-	CameraResolver.setCFrame(entry, cframe)
+	self:setTargetCFrame(entry, cframe)
 	selected.position = position
 	selected.orientation = orientation
 	selected.cframe = cframe
@@ -707,7 +847,7 @@ end
 
 function module:beginKeyframeDrag(cameraName, data)
 	if not cameraName or not data then return end
-	self:selectCamera(cameraName, true)
+	self:selectTrack(cameraName, true)
 	local store = self:storeFor(cameraName)
 	store:setSelected(data)
 	self.isDraggingKeyframe = true
@@ -750,7 +890,7 @@ function module:endKeyframeDrag(cameraName, data)
 end
 
 function module:selectKeyframe(camName, data)
-	self:selectCamera(camName, true)
+	self:selectTrack(camName, true)
 	local store = self:storeFor(camName)
 	local selected = data
 	if not selected or not selected.cframe then
@@ -772,13 +912,13 @@ function module:selectKeyframe(camName, data)
 end
 
 function module:tweenCameraTo(targetCFrame)
-	local entry = self:activeCam()
+	local entry = self:activeTarget()
 	if not entry or not targetCFrame then return end
 	if self.tweenConnection then
 		self.tweenConnection:Disconnect()
 		self.tweenConnection = nil
 	end
-	local startCFrame = CameraResolver.getCFrame(entry)
+	local startCFrame = self:getTargetCFrame(entry)
 	if not startCFrame then return end
 	local startTime = os.clock()
 	local connection
@@ -786,7 +926,8 @@ function module:tweenCameraTo(targetCFrame)
 		local elapsed = os.clock() - startTime
 		local alpha = math.min(elapsed / Config.InterpolationDuration, 1)
 		alpha = 1 - (1 - alpha) ^ 2
-		CameraResolver.setCFrame(entry, startCFrame:Lerp(targetCFrame, alpha))
+					self:setTargetCFrame(entry, startCFrame:Lerp(targetCFrame, alpha))
+
 		if alpha >= 1 then
 			connection:Disconnect()
 			if self.tweenConnection == connection then
@@ -862,7 +1003,8 @@ end
 function module:resetToTopPlaybackCamera()
 	local topCamera = self:findTopPlaybackCamera()
 	if topCamera then
-		self:selectCamera(topCamera, true)
+					self:selectTrack(topCamera, true)
+
 		local track = self.ui.tracks[topCamera]
 		local topStart = track and (track.startTime or 0) or 0
 		local topEnd = track and (track.endTime or Config.MaxTime) or Config.MaxTime
@@ -873,6 +1015,24 @@ function module:resetToTopPlaybackCamera()
 	end
 	self:updatePlayhead()
 	self:updateTimeLabel()
+end
+
+function module:findPlaybackCameraAtTime(time)
+	if not self.ui or not self.ui.tracks then return nil end
+	local candidateName = nil
+	local candidateOrder = math.huge
+	for name, track in pairs(self.ui.tracks) do
+		local store = self:storeFor(name)
+		local startTime = track.startTime or 0
+		local endTime = track.endTime or Config.MaxTime
+		if track.row and store:count() > 0 and time >= startTime - EPSILON and time <= endTime + EPSILON then
+			if track.row.LayoutOrder < candidateOrder then
+				candidateName = name
+				candidateOrder = track.row.LayoutOrder
+			end
+		end
+	end
+	return candidateName
 end
 
 function module:findNextPlaybackCamera()
@@ -899,22 +1059,24 @@ function module:updateCameraByTime()
 	local store = self:storeFor(self.lastCam.name)
 	if store:count() == 0 then return end
 
-	local entry = self:activeCam()
+		local entry = self:activeTarget()
 	if not entry then return end
 
-			local prevKf, nextKf = store:findNeighbors(self.currentTime)
+				local prevKf, nextKf = store:findNeighbors(self.currentTime)
+
 		if prevKf and nextKf then
 			local span = nextKf.time - prevKf.time
 			local alpha = span > 0 and (self.currentTime - prevKf.time) / span or 0
 			alpha = math.clamp(alpha, 0, 1)
 			local easing = easingFunctions[prevKf.easing or (store.metadata and store.metadata.easing) or "EaseInOut"] or easingFunctions.EaseInOut
 			alpha = easing(alpha)
-			CameraResolver.setCFrame(entry, prevKf.cframe:Lerp(nextKf.cframe, alpha))
+							self:setTargetCFrame(entry, prevKf.cframe:Lerp(nextKf.cframe, alpha))
 
-	elseif prevKf then
-		CameraResolver.setCFrame(entry, prevKf.cframe)
-	elseif nextKf then
-		CameraResolver.setCFrame(entry, nextKf.cframe)
+		elseif prevKf then
+			self:setTargetCFrame(entry, prevKf.cframe)
+		elseif nextKf then
+			self:setTargetCFrame(entry, nextKf.cframe)
+
 	end
 end
 
@@ -931,29 +1093,24 @@ function module:updatePlayhead()
 end
 
 function module:startLoop()
-	self.connections.RenderStepped = RunService.RenderStepped:Connect(function(dt)
-			if self.isPlaying then
-				local activeName = self.lastCam and self.lastCam.name
-				local store = activeName and self:storeFor(activeName)
-				local track = activeName and self.ui.tracks[activeName]
-				local speedMultiplier = store and store.metadata and store.metadata.speedMultiplier or 1
-				local trackEnd = track and (track.endTime or Config.MaxTime) or Config.MaxTime
-				self.currentTime = self.currentTime + dt * speedMultiplier
-				if self.currentTime >= trackEnd - EPSILON then
-					local nextCamera = self:findNextPlaybackCamera()
-					if nextCamera then
-						local nextTrack = self.ui.tracks[nextCamera]
-						self:selectCamera(nextCamera, true)
-						local nextStart = nextTrack and (nextTrack.startTime or 0) or 0
-						local nextEnd = nextTrack and (nextTrack.endTime or Config.MaxTime) or Config.MaxTime
-						self.currentTime = math.clamp(self.currentTime, nextStart, nextEnd)
-					else
+		self.connections.RenderStepped = RunService.RenderStepped:Connect(function(dt)
+				if self.isPlaying then
+					local activeName = self.lastCam and self.lastCam.name
+					local store = activeName and self:storeFor(activeName)
+					local speedMultiplier = store and store.metadata and store.metadata.speedMultiplier or 1
+					self.currentTime = self.currentTime + dt * speedMultiplier
+					local playbackCamera = self:findPlaybackCameraAtTime(self.currentTime)
+					if playbackCamera then
+						if not self.lastCam or self.lastCam.name ~= playbackCamera then
+															self:selectTrack(playbackCamera, true)
+
+						end
+						self:updateCameraByTime()
+					elseif self.currentTime >= Config.MaxTime - EPSILON then
 						self:resetToTopPlaybackCamera()
 						self:pause()
 					end
 				end
-				self:updateCameraByTime()
-			end
 
 		if self.isDraggingPlayhead then
 			local mousePos = UserInputService:GetMouseLocation()
