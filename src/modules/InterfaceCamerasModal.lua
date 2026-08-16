@@ -318,8 +318,9 @@ self.propertyFields = {}
 		field.ZIndex = 53
 		UIFactory.corner(field, 4)
 		UIFactory.stroke(field, Theme.Border, 1, 0.25)
-			(target or self.propertyFields)[key] = field
-			field.FocusLost:Connect(function()
+		local fields = target or self.propertyFields
+		fields[key] = field
+		field.FocusLost:Connect(function()
 			if self.onPropertiesSubmitted then
 				self.onPropertiesSubmitted(self:getPropertyValues())
 			end
