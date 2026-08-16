@@ -419,7 +419,7 @@ function module:selectMapPart(part)
 	local baseName = name
 	local suffix = 1
 	while self.ui.tracks[name] and self.objectTargets[name] ~= part do
-		suffix += 1
+		suffix = suffix + 1
 		name = baseName .. "_" .. suffix
 	end
 	if not self.objectTargets[name] then
@@ -442,7 +442,7 @@ function module:addCamera()
 	local name
 	repeat
 		name = "cam_" .. _nextCamId
-		_nextCamId += 1
+		_nextCamId = _nextCamId + 1
 	until not CameraResolver.get(name)
 	local character = Players.LocalPlayer.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -667,7 +667,7 @@ end
 function module:_refreshTimelineHeight()
 	if self.ui.timelineMinimized then return end
 	local count = 0
-	for _ in pairs(self.ui.tracks) do count += 1 end
+	for _ in pairs(self.ui.tracks) do count = count + 1 end
 	local rowH = 36
 	local pad = 4
 	local desired = math.clamp(count * (rowH + pad) + 28, 160, 280)

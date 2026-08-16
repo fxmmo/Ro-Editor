@@ -1514,7 +1514,7 @@ function module:ensureTrack(cameraName)
 	row.BackgroundTransparency = 1
 	row.BorderSizePixel = 0
 			row.Active = true
-		self.trackOrder += 1
+		self.trackOrder = self.trackOrder + 1
 		row.LayoutOrder = self.trackOrder
 
 	local trackColor = self:getTrackColor(self.trackOrder)
