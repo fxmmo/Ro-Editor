@@ -21,15 +21,15 @@ local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua?v=2026-08-16-buildtopbar-fix") or error("[Ro-Editor] import failed")
-local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua?v=2026-08-16-buildtopbar-fix") or error("[Ro-Editor] import failed")
-local Icons = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Icon_Config.lua?v=2026-08-16-buildtopbar-fix") or error("[Ro-Editor] import failed")
+local CACHE_BUST = Dev.__RoEditorVersion and "?v=" .. tostring(Dev.__RoEditorVersion) or ""
+local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua" .. CACHE_BUST) or error("[Ro-Editor] import failed")
+local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua" .. CACHE_BUST) or error("[Ro-Editor] import failed")
+local Icons = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Icon_Config.lua" .. CACHE_BUST) or error("[Ro-Editor] import failed")
 local Theme = ThemeConfig.Theme
 local Config = ThemeConfig.Config
 local module = {}
 module.__index = module
 local BASE = "https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/"
-local CACHE_BUST = "?v=2026-08-16-buildtopbar-fix"
 
 local TRACK_PADDING = 8
 local KF_LABEL_OFFSET = 180

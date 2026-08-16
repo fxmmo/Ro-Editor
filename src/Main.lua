@@ -1,4 +1,4 @@
-local DEV_VERSION = "2026-08-16-explicit-interface-composition"
+local DEV_VERSION = tostring(math.random(100000000, 999999999))
 local _cache = {}
 local Dev
 do
@@ -46,7 +46,7 @@ local function import(url, name)
 end
 
 local BASE = "https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/"
-local CACHE_BUST = "?v=2026-08-16-explicit-interface-composition"
+local CACHE_BUST = "?v=" .. DEV_VERSION
 
 local KeyframeStore = import(BASE .. "modules/KeyframeStore.lua" .. CACHE_BUST, "KeyframeStore")
 local HandleSystem = import(BASE .. "modules/HandleSystem.lua" .. CACHE_BUST, "HandleSystem")
