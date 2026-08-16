@@ -1,19 +1,17 @@
 local Dev = _G.__RoEditorDev
 if not Dev then
-	local _cache = {}
 	Dev = {}
 	function Dev:Import(url)
-		if _cache[url] then
-			return _cache[url]
+		local source = game:HttpGet(url, true)
+		local chunk, compileError = loadstring(source)
+		if not chunk then
+			error(compileError or "compile failed")
 		end
-		local ok, result = pcall(function()
-			return loadstring(game:HttpGet(url))()
-		end)
-		if ok and result then
-			_cache[url] = result
-			return result
+		local result = chunk()
+		if not result then
+			error("module returned nil: " .. url)
 		end
-		return nil
+		return result
 	end
 	_G.__RoEditorDev = Dev
 end
@@ -21,10 +19,9 @@ local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local CACHE_BUST = Dev.__RoEditorVersion and "?v=" .. tostring(Dev.__RoEditorVersion) or ""
-local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua" .. CACHE_BUST) or error("[Ro-Editor] import failed")
-local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua" .. CACHE_BUST) or error("[Ro-Editor] import failed")
-local Icons = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Icon_Config.lua" .. CACHE_BUST) or error("[Ro-Editor] import failed")
+local UIFactory = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/modules/UIFactory.lua") or error("[Ro-Editor] import failed")
+local ThemeConfig = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Theme_Config.lua") or error("[Ro-Editor] import failed")
+local Icons = Dev:Import("https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/configs/Icon_Config.lua") or error("[Ro-Editor] import failed")
 local Theme = ThemeConfig.Theme
 local Config = ThemeConfig.Config
 local module = {}
@@ -147,7 +144,7 @@ local function merge(source)
 	for key, value in pairs(source) do module[key] = value end
 end
 local function importInterfaceModule(name)
-	local partial = Dev:Import(BASE .. "modules/" .. name .. ".lua" .. CACHE_BUST)
+	local partial = Dev:Import(BASE .. "modules/" .. name .. ".lua")
 	if not partial then error("[Ro-Editor] Failed to import " .. name) end
 	merge(partial)
 end
