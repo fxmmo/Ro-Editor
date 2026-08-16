@@ -1,4 +1,4 @@
-local DEV_VERSION = "2026-08-15-edit-modal-basepart-props"
+local DEV_VERSION = "2026-08-16-ui-modular-topbar"
 local _cache = {}
 local Dev = _G.__RoEditorDev
 if not Dev or Dev.__RoEditorVersion ~= DEV_VERSION then
