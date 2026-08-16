@@ -1,16 +1,26 @@
 local Dev = _G.__RoEditorDev
 if not Dev then
+	local _cache = {}
 	Dev = {}
 	function Dev:Import(url)
-		local source = game:HttpGet(url, true)
-		local chunk, compileError = loadstring(source)
-		if not chunk then
-			error(compileError or "compile failed")
+		if _cache[url] then
+			return _cache[url]
 		end
-		local result = chunk()
+		local ok, result = pcall(function()
+			local source = game:HttpGet(url, true)
+			local chunk, compileError = loadstring(source)
+			if not chunk then
+				error(compileError or "compile failed")
+			end
+			return chunk()
+		end)
+		if not ok then
+			error(result)
+		end
 		if not result then
 			error("module returned nil: " .. url)
 		end
+		_cache[url] = result
 		return result
 	end
 	_G.__RoEditorDev = Dev

@@ -1,16 +1,26 @@
 local Dev = _G.__RoEditorDev
 if not Dev then
+	local _cache = {}
 	Dev = {}
 	function Dev:Import(url)
-		local source = game:HttpGet(url, true)
-		local chunk, compileError = loadstring(source)
-		if not chunk then
-			error(compileError or "compile failed")
+		if _cache[url] then
+			return _cache[url]
 		end
-		local result = chunk()
+		local ok, result = pcall(function()
+			local source = game:HttpGet(url, true)
+			local chunk, compileError = loadstring(source)
+			if not chunk then
+				error(compileError or "compile failed")
+			end
+			return chunk()
+		end)
+		if not ok then
+			error(result)
+		end
 		if not result then
 			error("module returned nil: " .. url)
 		end
+		_cache[url] = result
 		return result
 	end
 	_G.__RoEditorDev = Dev
@@ -140,21 +150,64 @@ function module:refreshTimelineAxis()
 end
 
 
-local function merge(source)
-	for key, value in pairs(source) do module[key] = value end
-end
 local function importInterfaceModule(name)
 	local partial = Dev:Import(BASE .. "modules/" .. name .. ".lua")
 	if not partial then error("[Ro-Editor] Failed to import " .. name) end
-	merge(partial)
+	return partial
 end
-importInterfaceModule("InterfaceTopbar")
-importInterfaceModule("InterfaceCamerasModal")
-importInterfaceModule("InterfaceEditModal")
-importInterfaceModule("InterfaceKeyframeProperties")
-importInterfaceModule("InterfaceTrackProperties")
-importInterfaceModule("InterfaceTimelinePanel")
-importInterfaceModule("InterfaceTracks")
-importInterfaceModule("InterfaceKeyframes")
-if type(module.buildTopBar) ~= "function" then error("[Ro-Editor] InterfaceTopbar did not export buildTopBar") end
+local function delegate(source, name)
+	return function(self, ...)
+		local method = source[name]
+		if type(method) ~= "function" then error("[Ro-Editor] Missing method " .. name) end
+		return method(self, ...)
+	end
+end
+local InterfaceTopbar = importInterfaceModule("InterfaceTopbar")
+local InterfaceCamerasModal = importInterfaceModule("InterfaceCamerasModal")
+local InterfaceEditModal = importInterfaceModule("InterfaceEditModal")
+local InterfaceKeyframeProperties = importInterfaceModule("InterfaceKeyframeProperties")
+local InterfaceTrackProperties = importInterfaceModule("InterfaceTrackProperties")
+local InterfaceTimelinePanel = importInterfaceModule("InterfaceTimelinePanel")
+local InterfaceTracks = importInterfaceModule("InterfaceTracks")
+local InterfaceKeyframes = importInterfaceModule("InterfaceKeyframes")
+module.buildTopBar = delegate(InterfaceTopbar, "buildTopBar")
+module.buildCamerasModal = delegate(InterfaceCamerasModal, "buildCamerasModal")
+module.buildEditModal = delegate(InterfaceEditModal, "buildEditModal")
+module.openEditModal = delegate(InterfaceEditModal, "openEditModal")
+module.closeEditModal = delegate(InterfaceEditModal, "closeEditModal")
+module.repositionEditModal = delegate(InterfaceEditModal, "repositionEditModal")
+module.getPropertyValues = delegate(InterfaceEditModal, "getPropertyValues")
+module.setKeyframeProperties = delegate(InterfaceKeyframeProperties, "setKeyframeProperties")
+module.clearKeyframeProperties = delegate(InterfaceKeyframeProperties, "clearKeyframeProperties")
+module.setEditTool = delegate(InterfaceKeyframeProperties, "setEditTool")
+module.setEditSectionVisible = delegate(InterfaceKeyframeProperties, "setEditSectionVisible")
+module.toggleEditSection = delegate(InterfaceKeyframeProperties, "toggleEditSection")
+module.setViewToggle = delegate(InterfaceKeyframeProperties, "setViewToggle")
+module.openCamerasModal = delegate(InterfaceKeyframeProperties, "openCamerasModal")
+module.closeCamerasModal = delegate(InterfaceKeyframeProperties, "closeCamerasModal")
+module.repositionModal = delegate(InterfaceKeyframeProperties, "repositionModal")
+module.setTimelineMinimized = delegate(InterfaceKeyframeProperties, "setTimelineMinimized")
+module.buildTrackPropertiesPanel = delegate(InterfaceTrackProperties, "buildTrackPropertiesPanel")
+module.setButtonLabel = delegate(InterfaceTrackProperties, "setButtonLabel")
+module.getTrackPropertiesValues = delegate(InterfaceTrackProperties, "getTrackPropertiesValues")
+module.openTrackProperties = delegate(InterfaceTrackProperties, "openTrackProperties")
+module.closeTrackProperties = delegate(InterfaceTrackProperties, "closeTrackProperties")
+module.updateTrackName = delegate(InterfaceTrackProperties, "updateTrackName")
+module.buildTimelinePanel = delegate(InterfaceTimelinePanel, "buildTimelinePanel")
+module.buildRuler = delegate(InterfaceTimelinePanel, "buildRuler")
+module.buildPlayhead = delegate(InterfaceTimelinePanel, "buildPlayhead")
+module.setTrackRange = delegate(InterfaceTimelinePanel, "setTrackRange")
+module.endTrackResize = delegate(InterfaceTimelinePanel, "endTrackResize")
+module.beginTrackResize = delegate(InterfaceTimelinePanel, "beginTrackResize")
+module.getTrackColor = delegate(InterfaceTimelinePanel, "getTrackColor")
+module.ensureTrack = delegate(InterfaceTracks, "ensureTrack")
+module.setActiveCamera = delegate(InterfaceTracks, "setActiveCamera")
+module.removeTrack = delegate(InterfaceTracks, "removeTrack")
+module.renderKeyframes = delegate(InterfaceKeyframes, "renderKeyframes")
+module.createKeyframeVisual = delegate(InterfaceKeyframes, "createKeyframeVisual")
+module.removeKeyframeVisual = delegate(InterfaceKeyframes, "removeKeyframeVisual")
+module.updatePlayheadProximity = delegate(InterfaceKeyframes, "updatePlayheadProximity")
+module.createControlButton = delegate(InterfaceKeyframes, "createControlButton")
+module.createIconControl = delegate(InterfaceKeyframes, "createIconControl")
+module.setPlayheadPosition = delegate(InterfaceKeyframes, "setPlayheadPosition")
 return module
