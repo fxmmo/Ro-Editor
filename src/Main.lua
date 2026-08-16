@@ -46,11 +46,12 @@ local function import(url, name)
 end
 
 local BASE = "https://raw.githubusercontent.com/fxmmo/Ro-Editor/refs/heads/main/src/"
+local CACHE_BUST = "?v=2026-08-16-buildtopbar-fix"
 
-local KeyframeStore = import(BASE .. "modules/KeyframeStore.lua", "KeyframeStore")
-local HandleSystem = import(BASE .. "modules/HandleSystem.lua", "HandleSystem")
-local Interface = import(BASE .. "modules/Interface.lua", "Interface")
-local TimelineController = import(BASE .. "modules/TimelineController.lua", "TimelineController")
+local KeyframeStore = import(BASE .. "modules/KeyframeStore.lua" .. CACHE_BUST, "KeyframeStore")
+local HandleSystem = import(BASE .. "modules/HandleSystem.lua" .. CACHE_BUST, "HandleSystem")
+local Interface = import(BASE .. "modules/Interface.lua" .. CACHE_BUST, "Interface")
+local TimelineController = import(BASE .. "modules/TimelineController.lua" .. CACHE_BUST, "TimelineController")
 
 local System = {}
 System.__index = System
