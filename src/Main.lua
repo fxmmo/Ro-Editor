@@ -11,13 +11,20 @@ do
 		local lastErr
 		for attempt = 1, 3 do
 			local ok, result = pcall(function()
-				return loadstring(game:HttpGet(url, true))()
+				local source = game:HttpGet(url, true)
+				local chunk, compileError = loadstring(source)
+				if not chunk then
+					error(compileError or "compile failed")
+				end
+				return chunk()
 			end)
 			if ok and result then
 				_cache[url] = result
 				return result
 			elseif not ok then
 				lastErr = tostring(result)
+			else
+				lastErr = "module returned nil: " .. url
 			end
 			task.wait(0.5 * attempt)
 		end
